@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go mod tidy:*)",
+      "Bash(go build:*)",
+      "Bash(go test:*)",
+      "Bash(go mod download:*)",
+      "WebFetch(domain:www.linkedin.com)",
+      "WebFetch(domain:au.indeed.com)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

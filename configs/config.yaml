@@ -1,0 +1,78 @@
+# Your Professional Profile
+profile:
+  name: "James Shen"
+  email: "james.shen @ guidebee.com"
+  phone: "+61 401 xxx xx 8"
+  location: "Melbourne, VIC"
+
+  # Your skills (used for job matching)
+  skills:
+    - Go
+    - Rust
+    - React
+    - .Net Core
+    - Angular
+    - Python
+    - JavaScript
+    - Docker
+    - Kubernetes
+    - PostgreSQL
+    - REST APIs
+
+  # Years of experience in key areas
+  experience:
+    total_years: 25
+    backend_years: 15
+    frontend_years: 10
+    devops_years: 8
+
+  # Job preferences
+  preferences:
+    job_types:
+      - "Full-time"
+      - "Contract"
+    work_arrangements:
+      - "Remote"
+      - "Hybrid"
+
+    # Permanent role salary preferences (annual)
+    salary_min: 180000
+
+    # Contract rate preferences
+    contract:
+      hourly_rate_min: 100  # AUD per hour
+      daily_rate_min: 800   # AUD per day
+
+    locations:
+      - "Melbourne"
+      - "Remote"
+
+  # Your professional summary
+  summary: |
+    Experienced software engineer with strong backend development skills.
+    Passionate about building scalable systems and learning new technologies.
+
+# Job Board URLs to scrape
+job_boards:
+  seek:
+    enabled: true
+    # Multiple search URLs - scraper will fetch all of them
+    search_urls:
+      - "https://www.seek.com.au/jobs?keywords=golang&location=melbourne"
+      - "https://www.seek.com.au/jobs?keywords=go+developer&location=melbourne"
+      - "https://www.seek.com.au/contract-jobs?keywords=software+engineer&location=melbourne"
+      - "https://www.seek.com.au/jobs?keywords=rust&location=melbourne"
+
+  linkedin:
+    enabled: true
+    search_urls:
+      - "https://www.linkedin.com/jobs/search/?keywords=golang&location=Melbourne"
+      - "https://www.linkedin.com/jobs/search/?keywords=go+developer&location=Melbourne"
+      - "https://www.linkedin.com/jobs/search/?keywords=software+engineer&location=Melbourne"
+
+  indeed:
+    enabled: true
+    search_urls:
+      - "https://au.indeed.com/jobs?q=golang&l=Melbourne"
+      - "https://au.indeed.com/jobs?q=go+developer&l=Melbourne"
+      - "https://au.indeed.com/jobs?q=software+engineer&l=Melbourne"
