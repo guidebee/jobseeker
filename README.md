@@ -41,6 +41,18 @@ graph TB
     style R fill:#F44336
 ```
 
+## ⚠️ Disclaimer
+
+**IMPORTANT: Please read before using this application**
+
+- **Personal Use Only**: This repository is intended for personal, educational, and non-commercial use only.
+- **Web Scraping Compliance**: When scraping job boards (SEEK, LinkedIn, Indeed), you must abide by each website's Terms of Service, robots.txt, and acceptable use policies. It is your responsibility to ensure compliance with these policies.
+- **No Liability**: The author(s) of this repository accept no responsibility or liability for any disputes, issues, or consequences arising from the use of this software, including but not limited to violations of website policies, legal issues, or data misuse.
+- **Trial Implementation**: Only the **scan** and **analyze** components have been fully implemented and tested as a trial project using Claude Code. Other features mentioned in the roadmap are planned but not yet developed.
+- **Use at Your Own Risk**: By using this software, you acknowledge that you do so entirely at your own risk and agree to comply with all applicable laws and regulations.
+
+**Recommendation**: Always check the Terms of Service and robots.txt files of websites before scraping. Consider using official APIs where available.
+
 ## Features
 
 - **Multi-User Support**: Designed for multiple users with isolated data and profiles
