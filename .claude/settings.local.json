@@ -6,7 +6,9 @@
       "Bash(go test:*)",
       "Bash(go mod download:*)",
       "WebFetch(domain:www.linkedin.com)",
-      "WebFetch(domain:au.indeed.com)"
+      "WebFetch(domain:au.indeed.com)",
+      "Bash(./jobseeker.exe checkjd:*)",
+      "Bash(./jobseeker.exe:*)"
     ],
     "deny": [],
     "ask": []

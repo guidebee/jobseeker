@@ -72,6 +72,11 @@ jobseeker analyze --type permanent
 jobseeker list --recommended
 jobseeker list --contract --recommended
 jobseeker list --limit 20
+
+# Analyze recruiter job descriptions (NEW)
+jobseeker checkjd
+jobseeker checkjd --jd-dir custom_directory
+jobseeker checkjd --archive-dir archive --cover-dir coverletters
 ```
 
 ## Architecture
@@ -243,6 +248,58 @@ response, err := client.SendMessage(prompt)
 **Endpoint**: `https://api.github.com/users/{username}/repos`
 **Storage**: Cached as JSON in `ProfileData.GitHubRepos` during init
 
+#### 7. Job Description Analyzer (`internal/jd/`)
+
+**Purpose**: Analyze job descriptions received directly from recruiters (Word documents)
+
+**Components**:
+- `loader.go`: Loads .docx files from `jobdescriptions/` directory
+- `analyzer.go`: Analyzes JDs using Claude AI and generates cover letters
+
+**Key Features**:
+- Reads job descriptions in .docx format from `jobdescriptions/` directory
+- Analyzes skill match using user profile and resumes (no salary/location required)
+- Provides match score (0-100), pros/cons, matched skills, and missing skills
+- Interactive cover letter generation with user input
+- **Iterative refinement**: Users can provide feedback to regenerate cover letters until satisfied
+- Moves processed JDs to archive directory
+- Saves generated cover letters to `coverletters/` directory
+
+**Usage Pattern**:
+```go
+// Load job descriptions
+jds, err := jd.LoadJobDescriptions("jobdescriptions")
+
+// Create analyzer
+analyzer := jd.NewJDAnalyzer(apiKey, profile, resumes)
+
+// Analyze JD
+result, err := analyzer.AnalyzeJobDescription(jobDesc)
+
+// Generate cover letter with optional user input
+coverLetter, err := analyzer.GenerateCoverLetter(jobDesc, userInput)
+
+// Refine cover letter based on user feedback (iterative)
+refinedLetter, err := analyzer.RefineCoverLetter(jobDesc, coverLetter, feedback)
+
+// Archive processed file
+err = jobDesc.MoveToArchive("jobdescriptions/archive")
+```
+
+**Analysis Result Structure**:
+- `MatchScore`: 0-100 compatibility score
+- `Reasoning`: Overall assessment
+- `Pros`: List of positive matches
+- `Cons`: List of concerns or gaps
+- `KeySkillsMatched`: Skills from resume that match JD
+- `MissingSkills`: Skills required but not in resume
+- `ResumeUsed`: Which resume file was selected for analysis
+
+**Resume Selection Logic**:
+- Detects contract vs permanent from JD keywords
+- Matches role-specific keywords (senior, backend, etc.)
+- Defaults to first resume if no match
+
 ### Command Structure (`cmd/jobseeker/`)
 
 **CLI Framework**: Cobra (spf13/cobra)
@@ -253,6 +310,7 @@ response, err := client.SendMessage(prompt)
 - `scan.go`: Job scraping command
 - `analyze.go`: AI analysis command
 - `list.go`: Display jobs with filters
+- `checkjd.go`: Analyze recruiter job descriptions (NEW)
 
 **Global Initialization** (`initApp()`):
 - Called by most commands
