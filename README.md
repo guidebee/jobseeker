@@ -59,6 +59,8 @@ graph TB
 - **Automated Scraping**: Discovers jobs from SEEK, LinkedIn, and Indeed
 - **AI-Powered Matching**: Uses Claude Sonnet 4.5 to analyze job fit based on your profile
 - **Resume Integration**: Uses actual resume content for better matching
+- **Recruiter JD Analysis** (NEW): Analyze Word docs from recruiters with detailed skill matching
+- **Cover Letter Generation** (NEW): AI-generated cover letters with iterative refinement
 - **Smart Filtering**: Only surfaces jobs above your match threshold
 - **Profile Caching**: Caches resumes, GitHub repos, and profile data for efficiency
 - **Database Tracking**: SQLite database to track applications and avoid duplicates
@@ -172,7 +174,8 @@ jobseeker/
 │       ├── init.go         # Profile initialization
 │       ├── scan.go         # Scraper command
 │       ├── analyze.go      # AI analysis command
-│       └── list.go         # View jobs command
+│       ├── list.go         # View jobs command
+│       └── checkjd.go      # Analyze recruiter JDs & generate cover letters
 ├── internal/
 │   ├── database/           # Database models & setup
 │   │   ├── models.go      # User, Job, Application models
@@ -181,6 +184,9 @@ jobseeker/
 │   │   └── helpers.go     # Job type detection, stats
 │   ├── analyzer/           # Claude AI integration
 │   │   └── analyzer.go    # Job matching & analysis
+│   ├── jd/                 # Job description analysis (NEW)
+│   │   ├── loader.go      # Load .docx JDs from recruiters
+│   │   └── analyzer.go    # Analyze JDs & generate cover letters
 │   ├── profile/            # Profile management
 │   │   └── profile.go     # Config loading
 │   ├── resume/             # Resume handling
@@ -197,6 +203,10 @@ jobseeker/
 ├── configs/
 │   └── config.yaml         # User profile & preferences
 ├── resumes/                # User resume files (.docx)
+├── jobdescriptions/        # Recruiter JDs (.docx) (NEW)
+│   ├── archive/           # Processed JDs moved here
+│   └── README.md
+├── coverletters/           # Generated cover letters (NEW)
 ├── .env                    # API keys & settings
 └── jobseeker.db            # SQLite database
 ```
@@ -535,6 +545,384 @@ Total: 8 jobs
 
 ---
 
+### `jobseeker checkjd` - Analyze Recruiter Job Descriptions
+
+Analyzes job descriptions received directly from recruiters (typically via email as Word documents) and generates tailored cover letters with iterative refinement.
+
+**Key Features:**
+- Analyzes local .docx files from `jobdescriptions/` directory
+- Detailed skill matching against your profile and resumes
+- **Iterative cover letter refinement** - refine with feedback until satisfied
+- Automatic archiving of processed JDs
+- No salary/location required - focuses on skill match
+
+**Usage:**
+```bash
+jobseeker checkjd [flags]
+```
+
+**Flags:**
+- `--jd-dir string` - Directory containing job description .docx files (default: `jobdescriptions`)
+- `--archive-dir string` - Directory to move processed JDs (default: `jobdescriptions/archive`)
+- `--cover-dir string` - Directory to save generated cover letters (default: `coverletters`)
+
+#### Quick Start
+
+**1. Setup - Place JD files in directory:**
+```bash
+# Create directory structure
+mkdir -p jobdescriptions coverletters
+
+# Add your JD files
+jobdescriptions/
+├── Senior_Backend_Developer_TechCorp.docx
+├── Lead_Engineer_StartupXYZ.docx
+└── README.md
+```
+
+**2. Run analysis:**
+```bash
+jobseeker checkjd
+```
+
+**3. Interactive workflow - for each JD:**
+- ✓ Analyzes skill match and fit
+- ✓ Shows match score, pros/cons, matched skills
+- ✓ Optionally generates cover letter
+- ✓ **Iterative refinement loop** - refine until satisfied
+- ✓ Archives processed JD
+
+#### Example Session
+
+```
+$ jobseeker checkjd
+
+Found 2 job description(s) to process
+
+================================================================================
+Processing JD 1/2: Senior_Backend_Developer_TechCorp.docx
+================================================================================
+
+Analyzing job description with Claude AI...
+
+MATCH SCORE: 87/100
+
+Resume Used: backend_senior_resume.docx
+
+OVERALL ASSESSMENT:
+Strong match for backend development role. Your 8 years of Go and microservices
+experience aligns well with their requirements. The role focuses on building
+scalable APIs, which matches your background.
+
+PROS:
+  ✓ Extensive Go and microservices experience
+  ✓ Strong background in API development and system design
+  ✓ Experience with Docker and Kubernetes matches their infrastructure
+  ✓ Previous team leadership aligns with senior-level expectations
+
+CONS:
+  ✗ Limited GraphQL experience mentioned in JD
+  ✗ No mention of specific AWS services they use
+
+KEY SKILLS MATCHED:
+  • Go (Golang)
+  • Microservices Architecture
+  • Docker & Kubernetes
+  • PostgreSQL
+  • REST API Design
+
+SKILLS TO DEVELOP:
+  • GraphQL
+  • AWS Lambda
+
+Would you like to generate a cover letter for this job? (y/n): y
+
+You can provide additional context for the cover letter (optional).
+For example: specific projects, achievements, or why you're interested.
+You can paste multiple lines of text.
+
+Your context (or press Enter to skip):
+(Type END on a new line when done, or paste text and press Ctrl+D/Ctrl+Z)
+> I built a microservices platform that handles 50M requests/day with 99.99% uptime.
+> The system processes 2000+ req/sec using Go, Kubernetes, and PostgreSQL.
+> END
+
+Generating cover letter...
+
+--------------------------------------------------------------------------------
+GENERATED COVER LETTER:
+--------------------------------------------------------------------------------
+Dear Hiring Manager,
+
+I am writing to express my strong interest in the Senior Backend Developer
+position at TechCorp. With over 8 years of experience in Go development and
+microservices architecture, I am confident I can make immediate contributions
+to your engineering team.
+
+In my current role, I built a microservices platform that handles 50 million
+requests per day, leveraging Go, Docker, and Kubernetes to ensure scalability
+and reliability...
+
+[... rest of cover letter ...]
+
+--------------------------------------------------------------------------------
+
+Options:
+  1. Save this cover letter
+  2. Refine it (provide feedback for changes)
+  3. Discard and skip
+
+Enter your choice (1/2/3): 2
+
+What would you like to change?
+Examples: 'Make it more concise', 'Add more technical details',
+          'Emphasize leadership experience', 'More enthusiastic tone'
+You can paste multiple lines of detailed feedback.
+
+Your feedback:
+(Type END on a new line when done, or paste text and press Ctrl+D/Ctrl+Z)
+> Make it 30% shorter and add specific API performance metrics
+> Also mention the leadership aspect - I mentored 5 junior developers
+> END
+
+Refining cover letter based on your feedback...
+
+--------------------------------------------------------------------------------
+GENERATED COVER LETTER:
+--------------------------------------------------------------------------------
+Dear Hiring Manager,
+
+I'm excited to apply for the Senior Backend Developer role at TechCorp. With 8
+years specializing in Go microservices, I've built systems handling 50M+ daily
+requests with 99.99% uptime and <100ms p95 latency.
+
+My platform serves APIs processing 2000+ requests/second using Go, Kubernetes,
+and PostgreSQL. This hands-on experience in distributed systems and
+high-performance APIs directly matches your technical requirements...
+
+[... rest of refined cover letter ...]
+
+--------------------------------------------------------------------------------
+
+Options:
+  1. Save this cover letter
+  2. Refine it (provide feedback for changes)
+  3. Discard and skip
+
+Enter your choice (1/2/3): 1
+✓ Cover letter saved to: coverletters/Senior_Backend_Developer_TechCorp_coverletter.txt
+✓ Archived Senior_Backend_Developer_TechCorp.docx
+
+[Processing continues for next JD...]
+```
+
+#### Iterative Cover Letter Refinement
+
+**NEW FEATURE:** Refine cover letters with specific feedback until you're satisfied.
+
+**How it works:**
+1. **Generate** - AI creates initial cover letter from your resume + JD
+2. **Review** - See the generated letter
+3. **Choose** - Save, Refine, or Discard
+4. **Iterate** - Provide feedback, regenerate, review again
+5. **Repeat** - Until satisfied or decide to discard
+
+**Effective Feedback Examples:**
+
+✅ **Good (Specific):**
+- "Make it 30% shorter, keep only key points"
+- "Add specific metrics about performance improvements"
+- "Emphasize leadership and mentoring experience"
+- "Use more enthusiastic tone, less formal"
+- "Focus more on microservices architecture skills"
+- "Include technologies from the JD: GraphQL, AWS Lambda"
+
+❌ **Vague (Less Effective):**
+- "Make it better"
+- "I don't like it"
+- "Change the tone"
+
+**Common Refinement Patterns:**
+
+1. **Generic → Specific**
+   - Feedback: "Add metrics about my platform handling 50M requests/day"
+   - Result: Concrete achievements instead of generic statements
+
+2. **Too Long → Concise**
+   - Feedback: "Maximum 3 paragraphs, focus on key strengths"
+   - Result: Tight, impactful letter
+
+3. **Too Formal → Balanced**
+   - Feedback: "More conversational but still professional, like talking to a colleague"
+   - Result: Warm yet professional tone
+
+4. **Missing Points → Comprehensive**
+   - Feedback: "Also emphasize my team leadership and mentoring 5 junior developers"
+   - Result: Balanced technical + leadership showcase
+
+**Refinement Tips:**
+
+- **Be specific** - Say what to change (tone, length, content focus)
+- **Paste detailed feedback** - Multi-line input supported! Paste comprehensive feedback from notes or clipboard
+- **Iterate gradually** - Don't try to fix everything at once
+  1. First pass: Structure/length
+  2. Second pass: Content
+  3. Third pass: Tone/polish
+- **Reference your context** - "Emphasize the project I mentioned about 50M requests"
+- **Use examples** - "Make it sound like: 'I've built systems that...' not 'I have experience in...'"
+
+**How to Enter Multi-line Input:**
+- Just paste your text (from any source)
+- Type `END` on a new line when done
+- Or press Ctrl+D (Unix/Mac) or Ctrl+Z then Enter (Windows)
+- Press Enter immediately on first line to skip/use empty input
+
+**When to refine vs. accept:**
+
+Accept first draft when:
+- Core content is accurate and solid
+- Tone and length are appropriate
+- Key achievements well highlighted
+- Only minor word tweaks needed (can edit manually)
+
+Refine when:
+- Wrong tone (too formal/casual/generic)
+- Missing key experience points
+- Too long or too short
+- Doesn't emphasize what matters for this role
+- Sounds templated rather than personalized
+
+Discard when:
+- After 2-3 refinements, still not right
+- Decide job isn't a good fit
+- Want to start fresh with different initial context
+
+#### Tips & Best Practices
+
+**File Naming:**
+```
+✅ Senior_Backend_Dev_Google_2024.docx
+✅ Lead_Engineer_Microsoft_Remote.docx
+❌ JD_1.docx
+❌ Document.docx
+```
+
+**JD Content:**
+For best results, JDs should include:
+- Clear job title and role description
+- Technical requirements and skills
+- Responsibilities and expectations
+- Company information (optional)
+
+Note: Salary and location are optional - analysis focuses on skill match.
+
+**Initial Context Input:**
+When prompted for additional context, consider mentioning:
+- Specific projects relevant to the role
+- Notable achievements or metrics
+- Why you're interested in this company/role
+- Unique experiences not in your resume
+
+**Multi-line Input Support:**
+- You can paste multiple lines of text from any source
+- Type `END` on a new line to finish, or press Ctrl+D (Unix/Mac) or Ctrl+Z (Windows)
+- Perfect for pasting detailed project descriptions or achievement lists
+- Press Enter immediately to skip
+
+**Resume Selection:**
+The tool auto-selects the best resume based on:
+1. Contract vs Permanent (keywords in JD and filename)
+2. Role keywords (senior, backend, lead, etc.)
+3. Default to first resume
+
+Name your resumes descriptively:
+- `resume_backend_senior.docx`
+- `resume_contract.docx`
+- `resume_permanent_fullstack.docx`
+
+**Directory Structure:**
+```
+jobdescriptions/          # Place JDs here
+├── archive/             # Auto-moved after processing
+└── README.md
+
+coverletters/            # Saved cover letters
+└── {JD_name}_coverletter.txt
+
+resumes/                 # Your resumes (for analysis)
+└── *.docx
+```
+
+#### Workflow Integration
+
+**Typical workflow:**
+1. **Receive JD from recruiter** (via email)
+2. **Save as .docx** in `jobdescriptions/`
+3. **Run** `jobseeker checkjd`
+4. **Review analysis** - decide if worth pursuing
+5. **Generate cover letter** - with personalized input
+6. **Refine iteratively** - perfect the cover letter
+7. **Apply** - use generated cover letter + resume
+
+**Multiple JDs:**
+Process all .docx files in one batch:
+- Add multiple JDs to directory
+- Run checkjd once
+- Skip cover letters for low-scoring matches
+- Archive without cover letter if not interested
+
+#### Troubleshooting
+
+**No JDs Found:**
+```
+No job descriptions found in jobdescriptions
+```
+→ Ensure .docx files are in directory
+→ Not temporary files (starting with ~$)
+
+**Failed to Parse:**
+```
+Warning: failed to parse JobTitle.docx
+```
+→ Valid .docx format (Word document)
+→ Not corrupted or password-protected
+→ Re-save from Word if necessary
+
+**Claude API Error:**
+```
+Error analyzing: failed to get Claude response
+```
+→ Verify CLAUDE_API_KEY in .env
+→ Check API key validity
+→ Ensure API credits remain
+
+**No Resumes:**
+```
+Warning: Could not load resumes
+```
+→ Tool falls back to config.yaml
+→ Add .docx resumes to resumes/ for better results
+
+#### Output Files
+
+**Cover Letters:**
+```
+coverletters/
+├── Senior_Backend_Developer_TechCorp_coverletter.txt
+└── Lead_Engineer_StartupXYZ_coverletter.txt
+```
+
+**Archived JDs:**
+```
+jobdescriptions/
+├── archive/
+│   ├── Senior_Backend_Developer_TechCorp.docx
+│   └── Lead_Engineer_StartupXYZ.docx
+└── README.md
+```
+
+---
+
 ## Complete Workflows
 
 ### Workflow 1: Basic Job Search
@@ -588,6 +976,29 @@ jobseeker analyze
 
 # 4. See results
 jobseeker list --recommended --limit 5
+```
+
+### Workflow 5: Recruiter Job Descriptions (NEW)
+```bash
+# 1. Save recruiter JD as .docx
+mkdir jobdescriptions
+# Place: Senior_Backend_Dev_TechCorp.docx in jobdescriptions/
+
+# 2. Analyze and generate cover letter
+jobseeker checkjd
+
+# Interactive process:
+# - Review match analysis (score, pros/cons, skills)
+# - Optionally generate cover letter
+# - Provide initial context (projects, achievements)
+# - Refine iteratively with feedback
+# - Save final version
+
+# 3. Files created:
+# - coverletters/Senior_Backend_Dev_TechCorp_coverletter.txt
+# - jobdescriptions/archive/Senior_Backend_Dev_TechCorp.docx (archived)
+
+# 4. Apply with generated cover letter + resume
 ```
 
 ## Configuration
@@ -852,9 +1263,11 @@ go mod download
 
 | Command | Purpose | Key Flags |
 |---------|---------|-----------|
+| `jobseeker init` | Initialize profile and cache resumes | `--force`, `--github`, `--linkedin` |
 | `jobseeker scan` | Discover jobs from configured URLs | `--config`, `--database` |
 | `jobseeker analyze` | AI job matching with Claude | `--contract`, `--type` |
 | `jobseeker list` | View jobs from database | `--recommended`, `--contract`, `--type`, `--limit` |
+| `jobseeker checkjd` | Analyze recruiter JDs + generate cover letters (NEW) | `--jd-dir`, `--archive-dir`, `--cover-dir` |
 
 ### Common Command Combinations
 
@@ -873,6 +1286,9 @@ jobseeker list --status discovered --limit 20
 
 # Re-analyze with updated resume
 jobseeker analyze  # Automatically detects resumes in ./resumes/
+
+# Process recruiter JDs with cover letter generation (NEW)
+jobseeker checkjd  # Interactive: analyze → generate → refine → save
 ```
 
 ### File Locations
@@ -882,6 +1298,9 @@ jobseeker analyze  # Automatically detects resumes in ./resumes/
 | `configs/config.yaml` | Your profile, skills, salary preferences, search URLs |
 | `.env` | Claude API key and environment settings |
 | `resumes/*.docx` | Your resume(s) for better AI matching |
+| `jobdescriptions/*.docx` | Recruiter JDs to analyze (NEW) |
+| `jobdescriptions/archive/` | Processed JDs (NEW) |
+| `coverletters/*.txt` | Generated cover letters (NEW) |
 | `jobseeker.db` | SQLite database with all jobs and analysis |
 | `internal/scraper/scraper_test.go` | Scraper debugging tests |
 
@@ -899,8 +1318,9 @@ jobseeker analyze  # Automatically detects resumes in ./resumes/
 
 - [x] LinkedIn scraper
 - [x] Indeed scraper
+- [x] Recruiter JD analysis
+- [x] Cover letter generation with iterative refinement
 - [ ] Web dashboard for job review
-- [ ] Cover letter generation
 - [ ] Automated application submission
 - [ ] Email monitoring for recruiter responses
 - [ ] Resume tailoring per job

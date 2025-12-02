@@ -48,6 +48,7 @@ func init() {
 	rootCmd.AddCommand(scanCmd)
 	rootCmd.AddCommand(analyzeCmd)
 	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(checkjdCmd)
 }
 
 // initApp initializes database and profile
