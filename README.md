@@ -59,8 +59,10 @@ graph TB
 - **Automated Scraping**: Discovers jobs from SEEK, LinkedIn, and Indeed
 - **AI-Powered Matching**: Uses Claude Sonnet 4.5 to analyze job fit based on your profile
 - **Resume Integration**: Uses actual resume content for better matching
-- **Recruiter JD Analysis** (NEW): Analyze Word docs from recruiters with detailed skill matching
-- **Cover Letter Generation** (NEW): AI-generated cover letters with iterative refinement
+- **Recruiter JD Analysis**: Analyze Word docs from recruiters with detailed skill matching
+- **Cover Letter Generation**: AI-generated cover letters with iterative refinement
+- **Tailored CV Generation**: Auto-generate professionally formatted CVs in Word format using Claude's document skills
+- **Excel Export** (NEW): Export job search data to professional Excel spreadsheets with charts and analysis
 - **Smart Filtering**: Only surfaces jobs above your match threshold
 - **Profile Caching**: Caches resumes, GitHub repos, and profile data for efficiency
 - **Database Tracking**: SQLite database to track applications and avoid duplicates
@@ -923,6 +925,433 @@ jobdescriptions/
 
 ---
 
+### `jobseeker tailorcv` - Generate Tailored CVs
+
+Creates professionally formatted, job-specific CVs in Word format using Claude's document coauthoring skills. Each CV is automatically customized to emphasize relevant experience, incorporate job-specific keywords, and highlight the most applicable skills.
+
+**Key Features:**
+- Generates Word (.docx) CVs with professional formatting
+- Emphasizes relevant experience and skills for each job
+- Incorporates job-specific keywords naturally
+- Reorganizes content to prioritize the most relevant qualifications
+- Maintains all accuracy - no fabricated experience
+- Uses Claude Skills API with docx skill for native document creation
+- Batch mode for processing multiple JDs automatically
+
+**Usage:**
+```bash
+jobseeker tailorcv [flags]
+```
+
+**Flags:**
+- `--jd-dir string` - Directory containing job description .docx files (default: `jobdescriptions`)
+- `--output string` - Directory to save tailored CVs (default: `tailored_cvs`)
+- `--batch` - Batch mode: auto-process all JDs without prompts (skips matches < 60)
+
+**Prerequisites:**
+- At least one resume (.docx) in `resumes/` directory
+- Job descriptions (.docx) in `jobdescriptions/` directory
+- CLAUDE_API_KEY with Skills API access
+
+#### How It Works
+
+**Interactive Mode (Default):**
+```bash
+jobseeker tailorcv
+```
+
+For each job description:
+1. **Analyzes** the JD against your profile and resumes
+2. **Shows** match score, pros/cons, matched skills, missing skills
+3. **Asks** if you want to generate a tailored CV
+4. **Creates** Word CV using Claude's docx skill (30-60 seconds)
+5. **Saves** CV with descriptive filename to `tailored_cvs/`
+
+**Batch Mode:**
+```bash
+jobseeker tailorcv --batch
+```
+- Auto-processes all JDs without prompts
+- Only generates CVs for matches ≥ 60%
+- Perfect for bulk processing
+
+#### Example Session
+
+```
+$ jobseeker tailorcv
+
+Loaded 2 resume(s)
+Found 2 job description(s) to process
+
+================================================================================
+Processing JD 1/2: Senior_Backend_Developer_TechCorp.docx
+================================================================================
+
+Analyzing job description with Claude AI...
+
+MATCH SCORE: 85/100
+
+Resume Used: Backend_Senior_Engineer.docx
+
+OVERALL ASSESSMENT:
+Strong match with extensive backend experience and matching tech stack.
+
+PROS:
+  ✓ 8+ years backend experience matches senior requirement
+  ✓ Proficient in Go, Python, and microservices architecture
+  ✓ Experience with Docker, Kubernetes aligns with DevOps needs
+
+CONS:
+  ✗ Limited AWS experience (job prefers AWS, you have mostly GCP)
+  ✗ No GraphQL experience mentioned
+
+KEY SKILLS MATCHED:
+  • Go programming
+  • Microservices architecture
+  • Docker & Kubernetes
+  • RESTful API design
+  • PostgreSQL
+
+SKILLS TO DEVELOP:
+  • AWS (EC2, Lambda, RDS)
+  • GraphQL
+
+Would you like to generate a tailored CV for this job? (y/n): y
+
+Generating tailored CV using Claude Skills...
+This may take 30-60 seconds as Claude creates a professionally formatted Word document...
+
+✓ SUCCESS! Tailored CV saved to: tailored_cvs/CV_Senior_Backend_Developer_TechCorp_20260119.docx
+  File size: 47.3 KB
+
+Tip: Open the CV in Microsoft Word to review and make any final adjustments.
+
+Continue to next job description? (y/n): y
+```
+
+#### Directory Structure
+
+```
+jobdescriptions/          # Input JDs
+├── Senior_Backend_Developer_TechCorp.docx
+└── Lead_Engineer_StartupXYZ.docx
+
+resumes/                  # Your source resumes
+├── Backend_Senior_Engineer.docx
+└── Contract_Developer.docx
+
+tailored_cvs/             # Generated tailored CVs
+├── CV_Senior_Backend_Developer_TechCorp_20260119.docx
+└── CV_Lead_Engineer_StartupXYZ_20260119.docx
+```
+
+#### What Gets Tailored
+
+The tailored CV automatically:
+
+1. **Professional Summary**: Rewritten to highlight experience relevant to the specific role
+2. **Skills Section**: Reordered to prioritize job requirements (matching skills first)
+3. **Work Experience**: Emphasizes relevant projects and achievements
+4. **Keywords**: Naturally incorporates terminology from job description
+5. **Structure**: Reorganizes sections to highlight most relevant qualifications
+6. **Formatting**: Professional design with consistent fonts, spacing, and layout
+
+**Important**: The tool never fabricates experience or skills - it only restructures and emphasizes existing content from your resume.
+
+#### Workflow Integration
+
+**Combined with checkjd:**
+```bash
+# Analyze JD, generate cover letter, then tailored CV
+jobseeker checkjd           # Get analysis + cover letter
+jobseeker tailorcv          # Create matching CV
+
+# Result: Cover letter + tailored CV ready to submit
+```
+
+**Batch Processing:**
+```bash
+# Process 10 JDs from recruiters
+# Place all .docx files in jobdescriptions/
+jobseeker tailorcv --batch --output urgent_applications
+
+# Result: Tailored CVs for all high-match jobs (≥60%)
+```
+
+**Custom Output:**
+```bash
+# Organize by company
+jobseeker tailorcv --output applications/techcorp
+jobseeker tailorcv --jd-dir recruiters/startup --output applications/startups
+```
+
+#### Troubleshooting
+
+**No Resumes Found:**
+```
+failed to load resumes: no .docx files found in resumes directory
+```
+→ Add at least one .docx resume to `resumes/` directory
+
+**Skills API Error:**
+```
+API error (status 403): Skills API access required
+```
+→ Ensure your Claude API key has Skills API access enabled
+→ Check that beta headers are properly configured
+
+**File Download Fails:**
+```
+failed to download tailored CV: no file ID found in response
+```
+→ Claude Skills API response format may have changed
+→ Check logs for actual API response structure
+→ May need to update file ID extraction logic
+
+#### Output Files
+
+Generated CVs use this naming pattern:
+```
+CV_{JD_filename}_{YYYYMMDD}.docx
+```
+
+Examples:
+- `CV_Senior_Backend_Developer_TechCorp_20260119.docx`
+- `CV_Lead_Engineer_StartupXYZ_20260119.docx`
+
+**Note**: Date is appended to prevent overwrites if you regenerate CVs.
+
+#### Advanced Usage
+
+**Combine with other tools:**
+```bash
+# Full application package generator
+for jd in jobdescriptions/*.docx; do
+  # 1. Analyze
+  jobseeker checkjd
+
+  # 2. Generate CV
+  jobseeker tailorcv
+
+  # Result: Analysis + Cover Letter + Tailored CV per job
+done
+```
+
+**Quality control:**
+```bash
+# Interactive mode for important applications
+jobseeker tailorcv  # Review each before generating
+
+# Batch for volume applications
+jobseeker tailorcv --batch  # Auto-process all
+```
+
+---
+
+### `jobseeker export` - Export Jobs to Excel
+
+Exports job search data with AI analysis to a professional Excel spreadsheet using Claude's xlsx skill. Perfect for tracking applications, sharing results, or performing detailed analysis in Excel.
+
+**Key Features:**
+- Three-sheet Excel workbook with comprehensive data
+- Professional formatting with color-coding by match score
+- Clickable URL hyperlinks for easy access
+- Statistics dashboard with charts and summaries
+- Flexible filtering by status, score, type, and source
+- Auto-filtering and frozen headers for easy navigation
+
+**Usage:**
+```bash
+jobseeker export [flags]
+```
+
+**Flags:**
+- `--output`, `-o` - Output filename (default: auto-generated with timestamp)
+- `--recommended` - Export only recommended jobs (default if no status specified)
+- `--discovered` - Include discovered (unanalyzed) jobs
+- `--rejected` - Include rejected jobs
+- `--applied` - Include applied jobs
+- `--all-statuses` - Include all job statuses
+- `--min-score int` - Minimum match score (0-100)
+- `--max-results int` - Maximum number of jobs to export
+- `--job-type string` - Filter by type: contract or permanent
+- `--source string` - Filter by source: seek, linkedin, or indeed
+
+**Prerequisites:**
+- Jobs in database (run `jobseeker scan` first)
+- CLAUDE_API_KEY with Skills API access
+
+#### Excel File Structure
+
+**Sheet 1: Jobs Summary**
+- Complete job listings with all key details
+- Columns: ID, Title, Company, Location, Salary, Type, Source, Match Score, Status, Date, URL
+- Color-coded match scores: Red (0-49), Yellow (50-69), Green (70-100)
+- Clickable URL hyperlinks
+
+**Sheet 2: Detailed Analysis**
+- In-depth AI analysis for each job
+- Columns: ID, Title, Company, Match Score, Analysis Reasoning, Pros, Cons, Resume Used, Analyzed Date
+- Full pros/cons from Claude's analysis
+- Shows which resume was used for matching
+
+**Sheet 3: Statistics Dashboard**
+- Summary metrics and charts:
+  - Total jobs found
+  - Jobs by status (discovered, recommended, rejected, applied)
+  - Jobs by source (SEEK, LinkedIn, Indeed)
+  - Jobs by type (contract, permanent)
+  - Average match score
+  - Top 10 companies by job count
+  - Top 10 locations by job count
+
+#### Example Sessions
+
+**Basic Export (Recommended Jobs Only):**
+```bash
+$ jobseeker export
+
+Found 127 jobs in database
+Generating Excel spreadsheet with Claude Skills...
+This may take 30-90 seconds depending on the number of jobs...
+
+✓ SUCCESS! Jobs exported to Excel
+  File: jobs_export_20260119_143022.xlsx
+  Size: 124.7 KB
+
+The Excel file contains:
+  • Sheet 1: Jobs Summary - All job details
+  • Sheet 2: Detailed Analysis - Match scores, pros/cons
+  • Sheet 3: Statistics - Dashboard with charts
+
+Tip: Open in Microsoft Excel or Google Sheets to explore the data!
+```
+
+**Custom Export with Filters:**
+```bash
+$ jobseeker export --min-score 70 --max-results 50 --output top_jobs.xlsx
+
+Found 127 jobs in database
+Generating Excel spreadsheet with Claude Skills...
+
+✓ SUCCESS! Jobs exported to Excel
+  File: top_jobs.xlsx
+  Size: 87.3 KB
+```
+
+**Export All Jobs (All Statuses):**
+```bash
+$ jobseeker export --all-statuses --output complete_analysis.xlsx
+```
+
+**Export Contract Jobs Only:**
+```bash
+$ jobseeker export --job-type contract --source seek
+```
+
+#### Use Cases
+
+**Weekly Application Tracking:**
+```bash
+# Export recommended jobs for weekly review
+jobseeker scan
+jobseeker analyze
+jobseeker export --recommended --output weekly_jobs_$(date +%Y%m%d).xlsx
+```
+
+**Share with Recruiter:**
+```bash
+# Export high-scoring jobs to share with recruiter
+jobseeker export --min-score 80 --output for_recruiter.xlsx
+```
+
+**Performance Analysis:**
+```bash
+# Export all jobs for detailed analysis in Excel
+jobseeker export --all-statuses
+# Open Excel, use pivot tables, create custom charts
+```
+
+**Job Type Comparison:**
+```bash
+# Compare contract vs permanent opportunities
+jobseeker export --job-type contract --output contracts.xlsx
+jobseeker export --job-type permanent --output permanent.xlsx
+```
+
+#### Troubleshooting
+
+**No Jobs Found:**
+```
+No jobs found in database
+```
+→ Run `jobseeker scan` first to discover jobs
+
+**Export Criteria Too Restrictive:**
+```
+no jobs match the export criteria
+```
+→ Relax filters (lower `--min-score`, remove `--job-type`, etc.)
+
+**Skills API Error:**
+```
+API error (status 403): Skills API access required
+```
+→ Ensure your Claude API key has Skills API access with xlsx skill enabled
+
+**Large Export Takes Too Long:**
+→ Use `--max-results` to limit the number of jobs
+→ Split exports by source or type for better performance
+
+#### Advanced Usage
+
+**Automated Weekly Reports:**
+```bash
+#!/bin/bash
+# weekly_job_report.sh
+
+# Update job database
+jobseeker scan
+jobseeker analyze
+
+# Export with timestamp
+TIMESTAMP=$(date +%Y%m%d)
+jobseeker export --recommended --output "weekly_report_${TIMESTAMP}.xlsx"
+
+# Email to yourself (optional)
+# mail -s "Weekly Job Report" you@email.com -A "weekly_report_${TIMESTAMP}.xlsx" < /dev/null
+```
+
+**Multi-Source Analysis:**
+```bash
+# Export each source separately for comparison
+jobseeker export --source seek --output seek_jobs.xlsx
+jobseeker export --source linkedin --output linkedin_jobs.xlsx
+jobseeker export --source indeed --output indeed_jobs.xlsx
+
+# Compare quality and match rates across platforms
+```
+
+**Progressive Filtering:**
+```bash
+# Export all → Filter in Excel → Export refined list
+jobseeker export --all-statuses --output all_jobs.xlsx
+# Review in Excel, note top 50 IDs
+jobseeker export --min-score 75 --max-results 50 --output shortlist.xlsx
+```
+
+#### Excel Tips
+
+Once you have the export:
+
+1. **Sort by Match Score**: Click column header → Sort Z to A
+2. **Filter by Company**: Use auto-filter dropdown on Company column
+3. **Pivot Table Analysis**: Insert → PivotTable → Analyze by location, salary, etc.
+4. **Conditional Formatting**: Already applied to match scores, but you can add more
+5. **Charts**: Statistics sheet has dashboard, but you can create custom charts from Summary sheet
+
+---
+
 ## Complete Workflows
 
 ### Workflow 1: Basic Job Search
@@ -1267,7 +1696,9 @@ go mod download
 | `jobseeker scan` | Discover jobs from configured URLs | `--config`, `--database` |
 | `jobseeker analyze` | AI job matching with Claude | `--contract`, `--type` |
 | `jobseeker list` | View jobs from database | `--recommended`, `--contract`, `--type`, `--limit` |
-| `jobseeker checkjd` | Analyze recruiter JDs + generate cover letters (NEW) | `--jd-dir`, `--archive-dir`, `--cover-dir` |
+| `jobseeker checkjd` | Analyze recruiter JDs + generate cover letters | `--jd-dir`, `--archive-dir`, `--cover-dir` |
+| `jobseeker tailorcv` | Generate tailored CVs in Word format | `--jd-dir`, `--output`, `--batch` |
+| `jobseeker export` | Export jobs to Excel spreadsheet (NEW) | `--output`, `--recommended`, `--all-statuses`, `--min-score` |
 
 ### Common Command Combinations
 
@@ -1287,8 +1718,16 @@ jobseeker list --status discovered --limit 20
 # Re-analyze with updated resume
 jobseeker analyze  # Automatically detects resumes in ./resumes/
 
-# Process recruiter JDs with cover letter generation (NEW)
+# Process recruiter JDs with cover letter generation
 jobseeker checkjd  # Interactive: analyze → generate → refine → save
+
+# Generate tailored CVs from recruiter JDs
+jobseeker tailorcv  # Interactive: analyze → tailor CV → save
+jobseeker tailorcv --batch  # Auto-process all JDs with match >= 60
+
+# Export job search results to Excel (NEW)
+jobseeker export  # Export recommended jobs to timestamped Excel file
+jobseeker export --all-statuses --output my_jobs.xlsx  # Export all jobs
 ```
 
 ### File Locations
@@ -1298,9 +1737,10 @@ jobseeker checkjd  # Interactive: analyze → generate → refine → save
 | `configs/config.yaml` | Your profile, skills, salary preferences, search URLs |
 | `.env` | Claude API key and environment settings |
 | `resumes/*.docx` | Your resume(s) for better AI matching |
-| `jobdescriptions/*.docx` | Recruiter JDs to analyze (NEW) |
-| `jobdescriptions/archive/` | Processed JDs (NEW) |
-| `coverletters/*.txt` | Generated cover letters (NEW) |
+| `jobdescriptions/*.docx` | Recruiter JDs to analyze |
+| `jobdescriptions/archive/` | Processed JDs |
+| `coverletters/*.txt` | Generated cover letters |
+| `tailored_cvs/*.docx` | AI-generated tailored CVs (NEW) |
 | `jobseeker.db` | SQLite database with all jobs and analysis |
 | `internal/scraper/scraper_test.go` | Scraper debugging tests |
 

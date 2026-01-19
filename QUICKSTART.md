@@ -232,13 +232,96 @@ go mod download
 go build -o jobseeker.exe ./cmd/jobseeker
 ```
 
+## Advanced Features
+
+### Generate Tailored CVs (NEW!)
+
+Create job-specific CVs in Word format using Claude's document skills:
+
+**1. Place your resume(s) in the `resumes/` directory:**
+```cmd
+mkdir resumes
+# Copy your resume.docx into resumes/
+```
+
+**2. Add recruiter job descriptions to `jobdescriptions/`:**
+```cmd
+mkdir jobdescriptions
+# Save JD from recruiter email as .docx
+```
+
+**3. Generate tailored CVs:**
+```cmd
+jobseeker.exe tailorcv
+```
+
+**What happens:**
+- Analyzes each JD against your profile
+- Shows match score and skill analysis
+- Asks if you want to generate a tailored CV
+- Creates professionally formatted Word CV (30-60 seconds)
+- Saves to `tailored_cvs/` directory
+
+**Batch mode (auto-process all):**
+```cmd
+jobseeker.exe tailorcv --batch
+```
+Only generates CVs for jobs with ≥60% match score.
+
+**Expected output:**
+```
+Loaded 2 resume(s)
+Found 1 job description(s) to process
+
+Analyzing job description with Claude AI...
+
+MATCH SCORE: 85/100
+
+Resume Used: Backend_Senior_Engineer.docx
+
+KEY SKILLS MATCHED:
+  • Go programming
+  • Microservices architecture
+  • Docker & Kubernetes
+
+Would you like to generate a tailored CV for this job? (y/n): y
+
+Generating tailored CV using Claude Skills...
+✓ SUCCESS! Tailored CV saved to: tailored_cvs/CV_Senior_Backend_Developer_TechCorp_20260119.docx
+```
+
+**What gets tailored:**
+- Professional summary rewritten for the specific role
+- Skills reordered (job requirements first)
+- Work experience emphasizes relevant projects
+- Keywords from JD incorporated naturally
+- Professional Word formatting
+
+**Important:** Never fabricates experience - only reorganizes existing content!
+
+### Generate Cover Letters
+
+Analyze recruiter JDs and create cover letters:
+
+```cmd
+jobseeker.exe checkjd
+```
+
+**Interactive workflow:**
+1. Analyzes job description
+2. Shows match analysis
+3. Generates cover letter
+4. Lets you refine iteratively
+5. Saves final version
+
 ## Next Steps
 
 Once you're comfortable with basics:
 
-1. **Add more job boards**
-   - Implement LinkedIn scraper
-   - Add Indeed support
+1. **Complete application packages**
+   - Use `checkjd` for cover letters
+   - Use `tailorcv` for customized CVs
+   - Submit with confidence!
 
 2. **Improve matching**
    - Customize Claude's analysis prompt
@@ -246,7 +329,7 @@ Once you're comfortable with basics:
 
 3. **Automate everything**
    - Schedule scans with Windows Task Scheduler or cron
-   - Auto-generate cover letters
+   - Batch process recruiter JDs
    - Submit applications automatically
 
 4. **Build a dashboard**
