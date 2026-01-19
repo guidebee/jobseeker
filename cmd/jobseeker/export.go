@@ -134,15 +134,22 @@ func runExport(cmd *cobra.Command, args []string) error {
 		outputPath = export.GenerateFilename("jobs_export")
 	}
 
-	// Create exporter
-	exporter := export.NewJobExporter(apiKey)
+	// Create temporary exporter just to filter jobs
+	tempExporter := export.NewJobExporter(apiKey)
+	filteredJobs := tempExporter.FilterJobs(jobs, options)
 
-	// Export to Excel
-	fmt.Println("Generating Excel spreadsheet with Claude Skills...")
-	fmt.Println("This may take 30-90 seconds depending on the number of jobs...")
+	if len(filteredJobs) == 0 {
+		log.Println("No jobs match the export criteria")
+		return nil
+	}
+
+	log.Printf("Exporting %d jobs that match criteria", len(filteredJobs))
+
+	// Export to Excel using local library
+	fmt.Println("Generating Excel spreadsheet...")
 	fmt.Println()
 
-	err = exporter.ExportToExcel(jobs, outputPath, options)
+	err = export.GenerateExcelLocally(filteredJobs, outputPath)
 	if err != nil {
 		return fmt.Errorf("export failed: %w", err)
 	}
