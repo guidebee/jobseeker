@@ -8,7 +8,10 @@
       "WebFetch(domain:www.linkedin.com)",
       "WebFetch(domain:au.indeed.com)",
       "Bash(./jobseeker.exe checkjd:*)",
-      "Bash(./jobseeker.exe:*)"
+      "Bash(./jobseeker.exe:*)",
+      "WebSearch",
+      "WebFetch(domain:platform.claude.com)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "ask": []

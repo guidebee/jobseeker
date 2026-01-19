@@ -7,17 +7,25 @@ profile:
 
   # Your skills (used for job matching)
   skills:
-    - Go
-    - Rust
     - React
-    - .Net Core
-    - Angular
-    - Python
     - JavaScript
+    - TypeScript
+    - Node.js
+    - Python
+    - Go
+    - DevOps
     - Docker
     - Kubernetes
+    - AWS
+    - Azure
+    - CI/CD
+    - Data Science
+    - Machine Learning
+    - FinTech
     - PostgreSQL
+    - MongoDB
     - REST APIs
+    - GraphQL
 
   # Years of experience in key areas
   experience:
@@ -46,11 +54,13 @@ profile:
     locations:
       - "Melbourne"
       - "Remote"
+      - "Hybrid"
 
   # Your professional summary
   summary: |
-    Experienced software engineer with strong backend development skills.
-    Passionate about building scalable systems and learning new technologies.
+    Versatile software engineer with expertise in React frontend development, full-stack solutions,
+    DevOps practices, and emerging technologies. Strong background in FinTech and data-driven applications.
+    Passionate about building scalable systems and delivering innovative solutions.
 
 # Job Board URLs to scrape
 job_boards:
@@ -58,21 +68,29 @@ job_boards:
     enabled: true
     # Multiple search URLs - scraper will fetch all of them
     search_urls:
-      - "https://www.seek.com.au/jobs?keywords=golang&location=melbourne"
-      - "https://www.seek.com.au/jobs?keywords=go+developer&location=melbourne"
-      - "https://www.seek.com.au/contract-jobs?keywords=software+engineer&location=melbourne"
-      - "https://www.seek.com.au/jobs?keywords=rust&location=melbourne"
+      - "https://www.seek.com.au/jobs?keywords=react%20frontend&location=melbourne"
+      - "https://www.seek.com.au/jobs?keywords=full%20stack&location=melbourne"
+      - "https://www.seek.com.au/jobs?keywords=devops&location=melbourne"
+      - "https://www.seek.com.au/jobs?keywords=fintech&location=melbourne"
+      - "https://www.seek.com.au/jobs?keywords=data%20science&location=melbourne"
+      - "https://www.seek.com.au/contract-jobs?keywords=react%20developer&location=melbourne"
+      - "https://www.seek.com.au/contract-jobs?keywords=fullstack%20engineer&location=melbourne"
 
   linkedin:
     enabled: true
     search_urls:
-      - "https://www.linkedin.com/jobs/search/?keywords=golang&location=Melbourne"
-      - "https://www.linkedin.com/jobs/search/?keywords=go+developer&location=Melbourne"
-      - "https://www.linkedin.com/jobs/search/?keywords=software+engineer&location=Melbourne"
+      - "https://www.linkedin.com/jobs/search/?keywords=react%20frontend&location=melbourne"
+      - "https://www.linkedin.com/jobs/search/?keywords=full%20stack&location=melbourne"
+      - "https://www.linkedin.com/jobs/search/?keywords=devops%20engineer&location=melbourne"
+      - "https://www.linkedin.com/jobs/search/?keywords=fintech&location=melbourne"
+      - "https://www.linkedin.com/jobs/search/?keywords=data%20science&location=melbourne"
 
   indeed:
     enabled: true
     search_urls:
-      - "https://au.indeed.com/jobs?q=golang&l=Melbourne"
-      - "https://au.indeed.com/jobs?q=go+developer&l=Melbourne"
-      - "https://au.indeed.com/jobs?q=software+engineer&l=Melbourne"
+      - "https://au.indeed.com/jobs?q=react%20frontend&l=melbourne"
+      - "https://au.indeed.com/jobs?q=full%20stack&l=melbourne"
+      - "https://au.indeed.com/jobs?q=devops&l=melbourne"
+      - "https://au.indeed.com/jobs?q=fintech&l=melbourne"
+      - "https://au.indeed.com/jobs?q=data%20science&l=melbourne"
+      - "https://au.indeed.com/jobs?q=machine%20learning&l=melbourne"
