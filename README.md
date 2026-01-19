@@ -69,6 +69,40 @@ graph TB
 - **Extensible**: Easy to add new job boards and customize matching logic
 - **SaaS Ready**: Built with subscription plans and usage limits for future public deployment
 
+## Real-World Example: James Shen's Job Search in Melbourne
+
+This project is actively being used by James Shen to find roles in Melbourne focusing on React Frontend, FullStack, DevOps, FinTech, and Data Science positions. Below are real job listings discovered and analyzed by the system:
+
+| Title | Company | Salary | Source | Score | Status | Pros | Cons | URL |
+|-------|---------|--------|--------|-------|--------|------|------|-----|
+| Computer Vision Scientist | Amazon | $180,000 - $220,000 per year | seek | 72 | recommended | ✓ Strong ML/AI background match<br>✓ Backend experience with Python/Go applicable<br>✓ Cloud infrastructure skills relevant | ✗ Less frontend experience than ideal<br>✗ Limited computer vision specialization | [View Job](https://www.seek.com.au/job/81585471) |
+| Data Scientist (LLM) | Binance | Not specified | seek | 78 | recommended | ✓ Excellent AI/ML expertise match<br>✓ Strong programming skills (Python, Go)<br>✓ Data engineering background relevant | ✗ Cryptocurrency domain new area<br>✗ Less emphasis on traditional backend | [View Job](https://www.seek.com.au/job/81553656) |
+| Director, Data Governance | AUSTRAC | $163,323 - $182,568 per year | seek | 72 | recommended | ✓ Senior leadership experience<br>✓ Technical architecture background<br>✓ Government sector stability | ✗ More governance/management than hands-on coding<br>✗ Less emphasis on modern frameworks | [View Job](https://www.seek.com.au/job/81588234) |
+| Web Architect/Developer | Binance | Not specified | seek | 72 | recommended | ✓ Strong fullstack expertise (React, Node.js)<br>✓ Architecture and system design skills<br>✓ Performance optimization experience | ✗ Cryptocurrency industry unfamiliar<br>✗ Less emphasis on backend microservices | [View Job](https://www.seek.com.au/job/81567933) |
+| Senior Site Reliability Engineer | Binance | Not specified | seek | 72 | recommended | ✓ Strong DevOps/infrastructure background<br>✓ Kubernetes & cloud experience<br>✓ Backend development skills relevant | ✗ SRE less aligned with primary fullstack focus<br>✗ On-call responsibilities intensive | [View Job](https://www.seek.com.au/job/81567934) |
+
+**About the Search:**
+- **Location**: Melbourne, VIC (Remote and Hybrid options included)
+- **Target Roles**: React Frontend, FullStack Developer, DevOps Engineer, FinTech, Data Science
+- **Match Threshold**: 70+ (recommended jobs shown above)
+- **Total Jobs Found**: 19 recommended positions exported to `james.xlsx`
+- **Analysis Method**: Claude Sonnet 4.5 analyzing job descriptions against resume and profile
+
+**Key Findings:**
+- Strong matches in Data Science and AI/ML roles (78% match for LLM Data Scientist role)
+- Multiple opportunities at leading tech companies (Amazon, Binance, AUSTRAC)
+- Salary ranges from $160K-$220K+ annually for senior positions
+- Diverse role types: Computer Vision, Data Science, Web Architecture, DevOps/SRE
+
+**Next Steps:**
+- Generate tailored CVs using `jobseeker tailorcv` for high-match positions
+- Create cover letters with `jobseeker checkjd` for recruiter-provided JDs
+- Track applications and export results with `jobseeker export`
+
+*This demonstrates real job search automation in action - from scanning to AI analysis to actionable recommendations.*
+
+---
+
 ## How It Works
 
 ```mermaid

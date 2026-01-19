@@ -35,7 +35,7 @@ type ExportOptions struct {
 // ExportToExcel exports jobs to an Excel file using Claude's xlsx skill
 func (e *JobExporter) ExportToExcel(jobs []database.Job, outputPath string, options ExportOptions) error {
 	// Filter jobs based on options
-	filteredJobs := e.filterJobs(jobs, options)
+	filteredJobs := e.FilterJobs(jobs, options)
 
 	if len(filteredJobs) == 0 {
 		return fmt.Errorf("no jobs match the export criteria")
@@ -77,8 +77,8 @@ func (e *JobExporter) ExportToExcel(jobs []database.Job, outputPath string, opti
 	return nil
 }
 
-// filterJobs filters jobs based on export options
-func (e *JobExporter) filterJobs(jobs []database.Job, options ExportOptions) []database.Job {
+// FilterJobs filters jobs based on export options
+func (e *JobExporter) FilterJobs(jobs []database.Job, options ExportOptions) []database.Job {
 	var filtered []database.Job
 
 	for _, job := range jobs {
@@ -285,6 +285,28 @@ func (e *JobExporter) extractFileIDFromResponse(response *claude.SkillsResponse)
 						fmt.Printf("%s ", key)
 					}
 					fmt.Printf("\n")
+
+					// Print all content values
+					for key, val := range contentMap {
+						if key == "content" {
+							// This might be base64 encoded file data
+							fmt.Printf("[DEBUG] Found 'content' key, value type: %T, length: ", val)
+							if strVal, ok := val.(string); ok {
+								fmt.Printf("%d chars\n", len(strVal))
+								if len(strVal) > 0 {
+									fmt.Printf("[DEBUG] Content appears to be file data (first 100 chars): %s\n", truncateText(strVal, 100))
+								}
+							} else {
+								fmt.Printf("unknown\n")
+							}
+						} else if key == "stdout" || key == "stderr" {
+							if strVal, ok := val.(string); ok && strVal != "" {
+								fmt.Printf("[DEBUG] %s: %s\n", key, truncateText(strVal, 200))
+							}
+						} else {
+							fmt.Printf("[DEBUG] %s: %v\n", key, val)
+						}
+					}
 				}
 			}
 
