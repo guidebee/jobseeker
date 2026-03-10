@@ -12,7 +12,7 @@ import (
 const (
 	APIBaseURL      = "https://api.minimax.io/v1/text/chatcompletion_v2"
 	DefaultModel    = "MiniMax-M2.5"
-	DefaultMaxTokens = 512
+	DefaultMaxTokens = 8192
 )
 
 // Client handles communication with MiniMax API
