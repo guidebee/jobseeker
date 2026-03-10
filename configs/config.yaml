@@ -41,7 +41,6 @@ profile:
       - "Contract"
     work_arrangements:
       - "Remote"
-      - "Hybrid"
 
     # Permanent role salary preferences (annual)
     salary_min: 180000
@@ -52,9 +51,7 @@ profile:
       daily_rate_min: 800   # AUD per day
 
     locations:
-      - "Melbourne"
       - "Remote"
-      - "Hybrid"
 
   # Your professional summary
   summary: |
@@ -66,31 +63,30 @@ profile:
 job_boards:
   seek:
     enabled: true
-    # Multiple search URLs - scraper will fetch all of them
+    # Multiple search URLs - scraper will fetch all of them (remote jobs only)
     search_urls:
-      - "https://www.seek.com.au/jobs?keywords=react%20frontend&location=melbourne"
-      - "https://www.seek.com.au/jobs?keywords=full%20stack&location=melbourne"
-      - "https://www.seek.com.au/jobs?keywords=devops&location=melbourne"
-      - "https://www.seek.com.au/jobs?keywords=fintech&location=melbourne"
-      - "https://www.seek.com.au/jobs?keywords=data%20science&location=melbourne"
-      - "https://www.seek.com.au/contract-jobs?keywords=react%20developer&location=melbourne"
-      - "https://www.seek.com.au/contract-jobs?keywords=fullstack%20engineer&location=melbourne"
+      - "https://www.seek.com.au/remote-jobs?keywords=react%20frontend"
+      - "https://www.seek.com.au/remote-jobs?keywords=full%20stack"
+      - "https://www.seek.com.au/remote-jobs?keywords=devops"
+      - "https://www.seek.com.au/remote-jobs?keywords=fintech"
+      - "https://www.seek.com.au/remote-jobs?keywords=data%20science"
+      - "https://www.seek.com.au/remote-jobs?keywords=software%20engineer"
 
   linkedin:
     enabled: true
     search_urls:
-      - "https://www.linkedin.com/jobs/search/?keywords=react%20frontend&location=melbourne"
-      - "https://www.linkedin.com/jobs/search/?keywords=full%20stack&location=melbourne"
-      - "https://www.linkedin.com/jobs/search/?keywords=devops%20engineer&location=melbourne"
-      - "https://www.linkedin.com/jobs/search/?keywords=fintech&location=melbourne"
-      - "https://www.linkedin.com/jobs/search/?keywords=data%20science&location=melbourne"
+      - "https://www.linkedin.com/jobs/search/?keywords=react%20frontend&f_WT=2"
+      - "https://www.linkedin.com/jobs/search/?keywords=full%20stack&f_WT=2"
+      - "https://www.linkedin.com/jobs/search/?keywords=devops%20engineer&f_WT=2"
+      - "https://www.linkedin.com/jobs/search/?keywords=fintech&f_WT=2"
+      - "https://www.linkedin.com/jobs/search/?keywords=data%20science&f_WT=2"
 
   indeed:
     enabled: true
     search_urls:
-      - "https://au.indeed.com/jobs?q=react%20frontend&l=melbourne"
-      - "https://au.indeed.com/jobs?q=full%20stack&l=melbourne"
-      - "https://au.indeed.com/jobs?q=devops&l=melbourne"
-      - "https://au.indeed.com/jobs?q=fintech&l=melbourne"
-      - "https://au.indeed.com/jobs?q=data%20science&l=melbourne"
-      - "https://au.indeed.com/jobs?q=machine%20learning&l=melbourne"
+      - "https://au.indeed.com/jobs?q=react%20frontend&l=&sc=0kf%3Aattr%28DSQF7%29%3B"
+      - "https://au.indeed.com/jobs?q=full%20stack&l=&sc=0kf%3Aattr%28DSQF7%29%3B"
+      - "https://au.indeed.com/jobs?q=devops&l=&sc=0kf%3Aattr%28DSQF7%29%3B"
+      - "https://au.indeed.com/jobs?q=fintech&l=&sc=0kf%3Aattr%28DSQF7%29%3B"
+      - "https://au.indeed.com/jobs?q=data%20science&l=&sc=0kf%3Aattr%28DSQF7%29%3B"
+      - "https://au.indeed.com/jobs?q=software%20engineer&l=&sc=0kf%3Aattr%28DSQF7%29%3B"

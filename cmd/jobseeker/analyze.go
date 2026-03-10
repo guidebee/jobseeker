@@ -39,10 +39,10 @@ func runAnalyze(cmd *cobra.Command, args []string) {
 	}
 	fmt.Printf("Analyzing jobs for: %s (%s)\n", user.Name, user.Email)
 
-	// Get Claude API key
-	apiKey := os.Getenv("CLAUDE_API_KEY")
+	// Get MiniMax API key (used for bulk job analysis)
+	apiKey := os.Getenv("MINIMAX_API_KEY")
 	if apiKey == "" {
-		log.Fatal("CLAUDE_API_KEY not set in environment")
+		log.Fatal("MINIMAX_API_KEY not set in environment")
 	}
 
 	// Get match threshold
@@ -60,7 +60,7 @@ func runAnalyze(cmd *cobra.Command, args []string) {
 		fmt.Println("✓ Using resume(s) for analysis")
 	}
 
-	fmt.Println("Analyzing jobs with Claude AI...")
+	fmt.Println("Analyzing jobs with MiniMax AI...")
 
 	// Get unanalyzed jobs from database
 	db := database.GetDB()
