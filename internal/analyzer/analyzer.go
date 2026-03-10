@@ -9,24 +9,24 @@ import (
 	"github.com/guidebee/jobseeker/internal/database"
 	"github.com/guidebee/jobseeker/internal/profile"
 	"github.com/guidebee/jobseeker/internal/resume"
-	"github.com/guidebee/jobseeker/pkg/claude"
+	"github.com/guidebee/jobseeker/pkg/minimax"
 )
 
-// Analyzer handles job matching using Claude AI
+// Analyzer handles job matching using MiniMax AI
 type Analyzer struct {
-	claudeClient *claude.Client
-	profile      *profile.Profile
-	resumes      []*resume.Resume
-	useResumes   bool
+	minimaxClient *minimax.Client
+	profile       *profile.Profile
+	resumes       []*resume.Resume
+	useResumes    bool
 }
 
 // NewAnalyzer creates a new job analyzer
 func NewAnalyzer(apiKey string, prof *profile.Profile) *Analyzer {
 	return &Analyzer{
-		claudeClient: claude.NewClient(apiKey),
-		profile:      prof,
-		resumes:      nil,
-		useResumes:   false,
+		minimaxClient: minimax.NewClient(apiKey),
+		profile:       prof,
+		resumes:       nil,
+		useResumes:    false,
 	}
 }
 
@@ -80,8 +80,8 @@ func (a *Analyzer) AnalyzeJob(job *database.Job) (*AnalysisResult, error) {
 	// Build the prompt for Claude
 	prompt := a.buildAnalysisPrompt(job)
 
-	// Send to Claude
-	response, err := a.claudeClient.SendMessage(prompt)
+	// Send to MiniMax
+	response, err := a.minimaxClient.SendMessage(prompt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Claude response: %w", err)
 	}
@@ -249,37 +249,3 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
-// GenerateCoverLetter creates a tailored cover letter for a job
-func (a *Analyzer) GenerateCoverLetter(job *database.Job) (string, error) {
-	prompt := fmt.Sprintf(`Write a professional cover letter for this job application.
-
-MY PROFILE:
-- Name: %s
-- Skills: %s
-- Experience: %d years
-- Summary: %s
-
-JOB:
-- Title: %s
-- Company: %s
-- Description: %s
-
-Write a concise, professional cover letter (3-4 paragraphs).
-Focus on relevant experience and enthusiasm for the role.
-Do not use placeholders - write complete sentences.`,
-		a.profile.Profile.Name,
-		a.profile.GetSkillsString(),
-		a.profile.Profile.Experience.TotalYears,
-		a.profile.Profile.Summary,
-		job.Title,
-		job.Company,
-		truncate(job.Description, 800),
-	)
-
-	coverLetter, err := a.claudeClient.SendMessage(prompt)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate cover letter: %w", err)
-	}
-
-	return coverLetter, nil
-}
