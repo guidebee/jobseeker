@@ -165,7 +165,7 @@ graph LR
 
     subgraph "Business Logic"
         B[Scraper<br/>Colly]
-        C[Analyzer<br/>Claude API]
+        C[Analyzer<br/>MiniMax API]
         D[Profile Manager]
         E[Resume Parser<br/>.docx]
     end
@@ -521,8 +521,7 @@ Loaded 2 resume(s) from ./resumes
   - SeniorDeveloper.docx
   - Contract_Resume.docx
 
-Analyzing jobs with Claude AI...
-Filtering for contract roles only...
+Analyzing jobs with MiniMax AI...
 Found 15 jobs to analyze
 
 [1/15] Analyzing: Contract Software Engineer at Tech Co (contract)
@@ -1609,7 +1608,7 @@ Loaded 3 resume(s) from ./resumes
   - Contract_Resume.docx
   - Senior_Backend_Resume.docx
 
-Analyzing jobs with Claude AI...
+Analyzing jobs with MiniMax AI...
 [1/22] Analyzing: Senior Backend Developer (permanent)
   Selected resume: Senior_Backend_Resume.docx
   ✓ Match: 94/100 - RECOMMENDED
@@ -1765,7 +1764,7 @@ Error: failed to get MiniMax response
 |---------|---------|-----------|
 | `jobseeker init` | Initialize profile and cache resumes | `--force`, `--github`, `--linkedin` |
 | `jobseeker scan` | Discover jobs from configured URLs | `--config`, `--database` |
-| `jobseeker analyze` | AI job matching with Claude | `--contract`, `--type` |
+| `jobseeker analyze` | AI job matching with MiniMax | `--contract`, `--type` |
 | `jobseeker list` | View jobs from database | `--recommended`, `--contract`, `--type`, `--limit` |
 | `jobseeker checkjd` | Analyze recruiter JDs + generate cover letters | `--jd-dir`, `--archive-dir`, `--cover-dir` |
 | `jobseeker tailorcv` | Generate tailored CVs in Word format | `--jd-dir`, `--output`, `--batch` |
