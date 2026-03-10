@@ -1,6 +1,10 @@
 # Jobseeker - AI-Powered Job Application Assistant
 
-An intelligent job search automation tool that discovers jobs, analyzes matches using Claude AI, and helps you apply to the best opportunities.
+An intelligent job search automation tool that discovers jobs, analyzes matches using AI, and helps you apply to the best opportunities.
+
+> **AI Architecture (Cost-Optimised):**
+> - **MiniMax** (`MiniMax-M1` or `MiniMax-M2.5`) — bulk job analysis (`analyze` command). Fast and cost-effective for processing hundreds of jobs at scale.
+> - **Claude** (`claude-sonnet-4-5`) — document processing only: recruiter JD analysis (`checkjd`), tailored CV generation (`tailorcv`), and cover letter writing. Used selectively where document quality matters most.
 
 ![jobseeker](./images/jobseeker.png)
 
@@ -21,7 +25,7 @@ graph TB
     end
 
     subgraph "AI Analysis"
-        E --> K[Claude Sonnet 4.5]
+        E --> K[MiniMax AI<br/>Bulk Analysis]
         J --> K
         K --> L[Match Score<br/>0-100]
         L --> M{Score >= 70?}
@@ -57,12 +61,12 @@ graph TB
 
 - **Multi-User Support**: Designed for multiple users with isolated data and profiles
 - **Automated Scraping**: Discovers jobs from SEEK, LinkedIn, and Indeed
-- **AI-Powered Matching**: Uses Claude Sonnet 4.5 to analyze job fit based on your profile
+- **AI-Powered Matching**: Uses **MiniMax AI** to analyze job fit at scale — fast and cost-effective for bulk processing hundreds of jobs
 - **Resume Integration**: Uses actual resume content for better matching
-- **Recruiter JD Analysis**: Analyze Word docs from recruiters with detailed skill matching
-- **Cover Letter Generation**: AI-generated cover letters with iterative refinement
-- **Tailored CV Generation**: Auto-generate professionally formatted CVs in Word format using Claude's document skills
-- **Excel Export** (NEW): Export job search data to professional Excel spreadsheets with charts and analysis
+- **Recruiter JD Analysis**: Analyze Word docs from recruiters with detailed skill matching using **Claude AI**
+- **Cover Letter Generation**: AI-generated cover letters with iterative refinement (powered by **Claude AI**)
+- **Tailored CV Generation**: Auto-generate professionally formatted CVs in Word format using **Claude's** document skills
+- **Excel Export**: Export job search data to professional Excel spreadsheets with charts and analysis
 - **Smart Filtering**: Only surfaces jobs above your match threshold
 - **Profile Caching**: Caches resumes, GitHub repos, and profile data for efficiency
 - **Database Tracking**: SQLite database to track applications and avoid duplicates
@@ -86,7 +90,7 @@ This project is actively being used by James Shen to find roles in Melbourne foc
 - **Target Roles**: React Frontend, FullStack Developer, DevOps Engineer, FinTech, Data Science
 - **Match Threshold**: 70+ (recommended jobs shown above)
 - **Total Jobs Found**: 19 recommended positions exported to `james.xlsx`
-- **Analysis Method**: Claude Sonnet 4.5 analyzing job descriptions against resume and profile
+- **Analysis Method**: MiniMax AI analyzing job descriptions against resume and profile
 
 **Key Findings:**
 - Strong matches in Data Science and AI/ML roles (78% match for LLM Data Scientist role)
@@ -111,7 +115,8 @@ sequenceDiagram
     participant CLI as Jobseeker CLI
     participant Scraper as Web Scraper
     participant DB as SQLite Database
-    participant Claude as Claude AI
+    participant MiniMax as MiniMax AI
+    participant Claude as Claude AI (docx)
 
     User->>CLI: jobseeker init
     CLI->>DB: Create user profile
@@ -124,10 +129,14 @@ sequenceDiagram
     User->>CLI: jobseeker analyze
     CLI->>DB: Get unanalyzed jobs
     loop For each job
-        CLI->>Claude: Send job + profile/resume
-        Claude->>CLI: Return match score & analysis
+        CLI->>MiniMax: Send job + profile/resume
+        MiniMax->>CLI: Return match score & analysis
         CLI->>DB: Save analysis result
     end
+
+    User->>CLI: jobseeker checkjd / tailorcv
+    CLI->>Claude: Send recruiter JD + resume
+    Claude->>CLI: Return analysis / cover letter / tailored CV
 
     User->>CLI: jobseeker list --recommended
     CLI->>DB: Query jobs (score >= 70)
@@ -168,7 +177,8 @@ graph LR
     end
 
     subgraph "External APIs"
-        I[Claude Sonnet 4.5<br/>Anthropic API]
+        I[MiniMax AI<br/>Bulk Job Analysis]
+        I2[Claude Sonnet 4.5<br/>docx: JD / CV / Cover Letter]
         J[GitHub API]
     end
 
@@ -187,13 +197,15 @@ graph LR
     B --> F
     C --> I
     C --> F
-    D --> E
+    D --> I2
+    D --> F
     D --> J
     D --> H
     F --> G
 
     style A fill:#E3F2FD
-    style I fill:#FFF3E0
+    style I fill:#E8F5E9
+    style I2 fill:#FFF3E0
     style G fill:#F3E5F5
     style K fill:#E8F5E9
     style L fill:#E8F5E9
@@ -255,10 +267,9 @@ jobseeker/
    - Download from: https://go.dev/dl/
    - Verify: `go version`
 
-2. **Get Claude API Key**
-   - Sign up at: https://console.anthropic.com/
-   - Create an API key
-   - You'll need this for AI job matching
+2. **Get API Keys**
+   - **MiniMax** (for bulk job analysis): Sign up at https://www.minimaxi.com/
+   - **Claude** (for checkjd / tailorcv / cover letters): Sign up at https://console.anthropic.com/
 
 ### Installation
 
@@ -278,9 +289,10 @@ jobseeker/
    copy .env.example .env
 
    # Edit .env and add:
-   # USER_EMAIL=your.email@example.com  (REQUIRED - must match config.yaml)
-   # CLAUDE_API_KEY=sk-ant-...
-   # GITHUB_USERNAME=yourghusername (optional)
+   # USER_EMAIL=your.email@example.com     (REQUIRED - must match config.yaml)
+   # MINIMAX_API_KEY=your_minimax_key      (REQUIRED - for bulk job analysis)
+   # CLAUDE_API_KEY=sk-ant-...             (for checkjd / tailorcv / cover letters)
+   # GITHUB_USERNAME=yourghusername        (optional)
    # LINKEDIN_URL=https://linkedin.com/in/yourprofile (optional)
    ```
 
@@ -478,7 +490,7 @@ Configured 3 search URLs
 
 ### `jobseeker analyze` - AI Job Matching
 
-Uses Claude AI to analyze jobs and provide match scores.
+Uses **MiniMax AI** to analyze jobs and provide match scores. MiniMax is used here for cost-effective bulk processing — ideal for scoring hundreds of jobs in a single run without blowing your API budget.
 
 **Usage:**
 ```bash
@@ -1468,23 +1480,37 @@ jobseeker checkjd
 
 ### Environment Variables (.env)
 ```bash
-# Required: Your Claude API key from https://console.anthropic.com/
-CLAUDE_API_KEY=your_api_key_here
+# Required: Your email (must match configs/config.yaml)
+USER_EMAIL=your.email@example.com
 
-# Optional: Model to use (default: claude-sonnet-4-5-20250929)
+# MiniMax API (used for bulk job analysis - analyze command)
+# Sign up at: https://www.minimaxi.com/
+MINIMAX_API_KEY=your_minimax_api_key_here
+MINIMAX_MODEL=MiniMax-M2.5   # or MiniMax-M1 (default)
+
+# Claude API (used for document processing: checkjd, tailorcv, cover letters)
+# Sign up at: https://console.anthropic.com/
+CLAUDE_API_KEY=sk-ant-...
 CLAUDE_MODEL=claude-sonnet-4-5-20250929
 
 # Optional: Database file path (default: ./jobseeker.db)
 DB_PATH=./jobseeker.db
 
 # Optional: Delay between scraper requests in milliseconds (default: 2000)
-# Higher values are more polite to websites, lower = faster scraping
 SCRAPER_DELAY_MS=2000
 
 # Optional: Minimum match score for recommendations (default: 70)
-# Jobs scoring below this will be marked as rejected
 MATCH_THRESHOLD=70
 ```
+
+**Why two AI providers?**
+
+| Command | AI Used | Reason |
+|---------|---------|--------|
+| `analyze` | **MiniMax** | Bulk processing — hundreds of jobs at low cost |
+| `checkjd` | **Claude** | High-quality document understanding for recruiter JDs |
+| `tailorcv` | **Claude** | Native Word (.docx) generation via Skills API |
+| Cover letters | **Claude** | Nuanced, polished writing quality |
 
 ### Profile Configuration (configs/config.yaml)
 
@@ -1715,10 +1741,21 @@ go mod download
   - The scraper already sets proper User-Agent, Referer, and Origin headers
   - Consider using proxies for high-volume scraping
 
-### Claude API errors
-- Check API key is set: `echo %CLAUDE_API_KEY%`
-- Verify key is valid in Anthropic console
-- Check rate limits (Tier 1: 50 requests/min)
+**Claude API Error (checkjd / tailorcv only):**
+```
+Error analyzing: failed to get Claude response
+```
+→ Verify CLAUDE_API_KEY in .env (only needed for checkjd, tailorcv, cover letters)
+→ Check API key validity at console.anthropic.com
+→ Check rate limits (Tier 1: 50 requests/min)
+
+**MiniMax API Error (analyze command):**
+```
+Error: failed to get MiniMax response
+```
+→ Verify MINIMAX_API_KEY in .env
+→ Check key validity at minimaxi.com
+→ Try MINIMAX_MODEL=MiniMax-M1 if M2.5 is unavailable
 
 ## Quick Reference Card
 
@@ -1782,8 +1819,11 @@ jobseeker export --all-statuses --output my_jobs.xlsx  # Export all jobs
 
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
-| `CLAUDE_API_KEY` | ✓ Yes | - | Your Anthropic API key |
-| `CLAUDE_MODEL` | No | sonnet-4.5 | AI model to use |
+| `USER_EMAIL` | ✓ Yes | - | Your email (must match config.yaml) |
+| `MINIMAX_API_KEY` | ✓ Yes | - | MiniMax API key for bulk job analysis |
+| `MINIMAX_MODEL` | No | `MiniMax-M1` | MiniMax model to use |
+| `CLAUDE_API_KEY` | For docx cmds | - | Claude API key for checkjd / tailorcv / cover letters |
+| `CLAUDE_MODEL` | No | `sonnet-4.5` | Claude model for document processing |
 | `DB_PATH` | No | `./jobseeker.db` | Database location |
 | `SCRAPER_DELAY_MS` | No | `2000` | Delay between requests |
 | `MATCH_THRESHOLD` | No | `70` | Minimum score for recommendations |
