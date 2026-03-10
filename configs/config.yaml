@@ -41,6 +41,8 @@ profile:
       - "Contract"
     work_arrangements:
       - "Remote"
+      - "On-site"
+      - "Hybrid"
 
     # Permanent role salary preferences (annual)
     salary_min: 180000
@@ -52,6 +54,8 @@ profile:
 
     locations:
       - "Remote"
+      - "Perth, WA"
+      - "Melbourne, VIC"
 
   # Your professional summary
   summary: |
@@ -63,30 +67,42 @@ profile:
 job_boards:
   seek:
     enabled: true
-    # Multiple search URLs - scraper will fetch all of them (remote jobs only)
     search_urls:
-      - "https://www.seek.com.au/remote-jobs?keywords=react%20frontend"
-      - "https://www.seek.com.au/remote-jobs?keywords=full%20stack"
-      - "https://www.seek.com.au/remote-jobs?keywords=devops"
-      - "https://www.seek.com.au/remote-jobs?keywords=fintech"
-      - "https://www.seek.com.au/remote-jobs?keywords=data%20science"
-      - "https://www.seek.com.au/remote-jobs?keywords=software%20engineer"
+      # Remote jobs - full stack & react
+      - "https://www.seek.com.au/remote-jobs?keywords=react%20developer"
+      - "https://www.seek.com.au/remote-jobs?keywords=full%20stack%20developer"
+      - "https://www.seek.com.au/remote-jobs?keywords=frontend%20developer"
+      # Perth onsite
+      - "https://www.seek.com.au/jobs?keywords=react%20developer&where=Perth+WA"
+      - "https://www.seek.com.au/jobs?keywords=full%20stack%20developer&where=Perth+WA"
+      - "https://www.seek.com.au/jobs?keywords=frontend%20developer&where=Perth+WA"
+      # Melbourne onsite
+      - "https://www.seek.com.au/jobs?keywords=react%20developer&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=full%20stack%20developer&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=frontend%20developer&where=Melbourne+VIC"
 
   linkedin:
     enabled: true
     search_urls:
-      - "https://www.linkedin.com/jobs/search/?keywords=react%20frontend&f_WT=2"
-      - "https://www.linkedin.com/jobs/search/?keywords=full%20stack&f_WT=2"
-      - "https://www.linkedin.com/jobs/search/?keywords=devops%20engineer&f_WT=2"
-      - "https://www.linkedin.com/jobs/search/?keywords=fintech&f_WT=2"
-      - "https://www.linkedin.com/jobs/search/?keywords=data%20science&f_WT=2"
+      # Remote (f_WT=2)
+      - "https://www.linkedin.com/jobs/search/?keywords=react%20developer&f_WT=2"
+      - "https://www.linkedin.com/jobs/search/?keywords=full%20stack%20developer&f_WT=2"
+      # Perth onsite
+      - "https://www.linkedin.com/jobs/search/?keywords=react%20developer&location=Perth%2C%20Western%20Australia&f_WT=1"
+      - "https://www.linkedin.com/jobs/search/?keywords=full%20stack%20developer&location=Perth%2C%20Western%20Australia&f_WT=1"
+      # Melbourne onsite
+      - "https://www.linkedin.com/jobs/search/?keywords=react%20developer&location=Melbourne%2C%20Victoria&f_WT=1"
+      - "https://www.linkedin.com/jobs/search/?keywords=full%20stack%20developer&location=Melbourne%2C%20Victoria&f_WT=1"
 
   indeed:
     enabled: true
     search_urls:
-      - "https://au.indeed.com/jobs?q=react%20frontend&l=&sc=0kf%3Aattr%28DSQF7%29%3B"
-      - "https://au.indeed.com/jobs?q=full%20stack&l=&sc=0kf%3Aattr%28DSQF7%29%3B"
-      - "https://au.indeed.com/jobs?q=devops&l=&sc=0kf%3Aattr%28DSQF7%29%3B"
-      - "https://au.indeed.com/jobs?q=fintech&l=&sc=0kf%3Aattr%28DSQF7%29%3B"
-      - "https://au.indeed.com/jobs?q=data%20science&l=&sc=0kf%3Aattr%28DSQF7%29%3B"
-      - "https://au.indeed.com/jobs?q=software%20engineer&l=&sc=0kf%3Aattr%28DSQF7%29%3B"
+      # Remote
+      - "https://au.indeed.com/jobs?q=react+developer&sc=0kf%3Aattr%28DSQF7%29%3B"
+      - "https://au.indeed.com/jobs?q=full+stack+developer&sc=0kf%3Aattr%28DSQF7%29%3B"
+      # Perth onsite
+      - "https://au.indeed.com/jobs?q=react+developer&l=Perth%2C+WA"
+      - "https://au.indeed.com/jobs?q=full+stack+developer&l=Perth%2C+WA"
+      # Melbourne onsite
+      - "https://au.indeed.com/jobs?q=react+developer&l=Melbourne%2C+VIC"
+      - "https://au.indeed.com/jobs?q=full+stack+developer&l=Melbourne%2C+VIC"
