@@ -90,7 +90,7 @@ func runScan(cmd *cobra.Command, args []string) {
 	}
 
 	// LinkedIn
-	if prof.JobBoards["linkedin"].Enabled {
+	if prof.JobBoards["linkedin"].Enabled && getEnv("LINKEDIN_SCAN_ENABLED", "true") != "false" {
 		fmt.Println("\nScanning LinkedIn...")
 
 		linkedinURLs := prof.JobBoards["linkedin"].SearchURLs

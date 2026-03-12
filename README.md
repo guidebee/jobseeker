@@ -1500,6 +1500,10 @@ SCRAPER_DELAY_MS=2000
 
 # Optional: Minimum match score for recommendations (default: 70)
 MATCH_THRESHOLD=70
+
+# Optional: Enable/disable LinkedIn scanning (default: true)
+# Set to false if LinkedIn is blocked in your network environment.
+LINKEDIN_SCAN_ENABLED=true
 ```
 
 **Why two AI providers?**
@@ -1721,14 +1725,15 @@ go mod download
 - Use browser DevTools to find correct CSS selectors
 
 **LinkedIn**:
-- LinkedIn uses heavy JavaScript rendering, so the scraper may find 0 jobs even when jobs exist
-- The scraper only gets the initial HTML without executing JavaScript
-- This is a known limitation of static HTML scraping
-- For reliable job discovery, focus on SEEK as the primary source
-- To improve LinkedIn scraping, consider:
-  - Using a headless browser library (chromedp, selenium)
-  - Switching to LinkedIn's official API (requires partnership)
-  - Using LinkedIn as a secondary, supplementary source
+- The scraper uses LinkedIn's public guest REST APIs (no JavaScript rendering required):
+  - `seeMoreJobPostings/search` — job list with titles, companies, locations, and job IDs
+  - `jobs-guest/jobs/api/jobPosting/{id}` — full job description for each result
+- Both endpoints work with plain HTTP (no headless browser needed)
+- LinkedIn scanning is optional. Disable it by setting `LINKEDIN_SCAN_ENABLED=false` in `.env`
+  if LinkedIn is unreachable or blocked in your environment
+- If you get 0 jobs or connection errors, LinkedIn may be rate-limiting your IP:
+  - Increase `SCRAPER_DELAY_MS` (try 3000–5000ms)
+  - Set `LINKEDIN_SCAN_ENABLED=false` and rely on SEEK as the primary source
 
 **Indeed**:
 - Indeed actively blocks scrapers with 403 errors if requests don't look like a real browser

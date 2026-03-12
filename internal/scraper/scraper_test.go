@@ -210,7 +210,8 @@ func TestSeekScraperWithDebug(t *testing.T) {
 	s := NewScraper(1000) // 1 second delay
 
 	// Add debug callbacks before scraping
-	s.collector.OnHTML("article[data-testid='job-card']", func(e *colly.HTMLElement) {
+	debugCollector := s.newCollector("seek.com.au", "www.seek.com.au")
+	debugCollector.OnHTML("article[data-testid='job-card']", func(e *colly.HTMLElement) {
 		fmt.Println("\n--- Debug: Found job card ---")
 
 		// Test each selector individually
