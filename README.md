@@ -1818,6 +1818,7 @@ jobseeker export --all-statuses --output my_jobs.xlsx  # Export all jobs
 | `tailored_cvs/*.docx` | AI-generated tailored CVs (NEW) |
 | `jobseeker.db` | SQLite database with all jobs and analysis |
 | `internal/scraper/scraper_test.go` | Scraper debugging tests |
+| `run_jobseeker.sh` | Full-pipeline cron job script (scan → analyze → email) |
 
 ### Environment Variables Quick Guide
 
@@ -1831,6 +1832,88 @@ jobseeker export --all-statuses --output my_jobs.xlsx  # Export all jobs
 | `DB_PATH` | No | `./jobseeker.db` | Database location |
 | `SCRAPER_DELAY_MS` | No | `2000` | Delay between requests |
 | `MATCH_THRESHOLD` | No | `70` | Minimum score for recommendations |
+
+## Automated Pipeline (Cron Job)
+
+`run_jobseeker.sh` is a ready-to-use shell script that runs the full pipeline unattended:
+
+```
+scan → analyze → query new recommended jobs → (optionally) email results → mark as emailed
+```
+
+### Quick Start
+
+```bash
+# Make executable
+chmod +x run_jobseeker.sh
+
+# Test a dry run (SEND_EMAIL=false by default — just prints results)
+./run_jobseeker.sh
+```
+
+### Configuration
+
+All settings are controlled via environment variables (set in `.env` or inline):
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SEND_EMAIL` | `false` | Set to `true` to send HTML email after scan |
+| `EMAIL_SCRIPT` | `/path/to/send_email.js` | Path to Node.js email sender (required if `SEND_EMAIL=true`) |
+| `TO` | `your.email@example.com` | Recipient email address |
+| `SUBJECT` | `Jobseeker: Recommended Jobs Update` | Email subject line |
+| `MIN_SCORE` | `70` | Minimum match score to include in results/email |
+
+### Schedule with Cron
+
+```bash
+# Open crontab editor
+crontab -e
+
+# Run every weekday at 8 AM, log output
+0 8 * * 1-5 /home/youruser/workspace/jobseeker/run_jobseeker.sh >> /tmp/jobseeker.log 2>&1
+
+# Run twice daily (8 AM and 6 PM) on weekdays
+0 8,18 * * 1-5 /home/youruser/workspace/jobseeker/run_jobseeker.sh >> /tmp/jobseeker.log 2>&1
+
+# Run once daily at 7 AM every day
+0 7 * * * /home/youruser/workspace/jobseeker/run_jobseeker.sh >> /tmp/jobseeker.log 2>&1
+```
+
+### What the Script Does
+
+1. **Loads `.env`** — API keys and user configuration
+2. **Scans job boards** — `jobseeker.exe scan` (SEEK, LinkedIn, Indeed)
+3. **Runs AI analysis** — `jobseeker.exe analyze` (MiniMax, unanalyzed jobs only)
+4. **Queries new recommendations** — jobs with `match_score >= MIN_SCORE` and `emailed_at IS NULL`
+5. **Prints summary** — top matches printed to stdout / log file regardless of email setting
+6. **Sends HTML email** *(optional)* — colour-coded email with match scores, pros/cons, and job links
+7. **Marks as emailed** — sets `emailed_at` timestamp so jobs aren't re-sent next run
+
+### Email Output Preview
+
+When `SEND_EMAIL=true`, the script sends a styled HTML email:
+- Green border → score ≥ 85
+- Yellow border → score 70–84
+- Each job shows: title (linked), company, location, salary, match badge, AI analysis, pros/cons
+
+### Prerequisites
+
+```bash
+# 1. Build the binary
+go build -o jobseeker.exe ./cmd/jobseeker
+
+# 2. Initialise your profile (run once)
+./jobseeker.exe init
+
+# 3. Verify .env has required keys
+#    USER_EMAIL, MINIMAX_API_KEY (for analyze)
+#    CLAUDE_API_KEY (only needed for checkjd / tailorcv)
+```
+
+> **Note:** `SEND_EMAIL=false` (the default) skips the email step entirely and just prints
+> results to stdout — useful for testing or when you prefer to review via `jobseeker list`.
+
+---
 
 ## Roadmap
 
