@@ -18,9 +18,15 @@ profile:
     - Kubernetes
     - AWS
     - Azure
+    - Azure AI Studio
+    - Azure OpenAI
     - CI/CD
     - Data Science
     - Machine Learning
+    - Generative AI
+    - RAG
+    - LangChain
+    - CrewAI
     - FinTech
     - PostgreSQL
     - MongoDB
@@ -59,27 +65,36 @@ profile:
 
   # Your professional summary
   summary: |
-    Versatile software engineer with expertise in React frontend development, full-stack solutions,
-    DevOps practices, and emerging technologies. Strong background in FinTech and data-driven applications.
-    Passionate about building scalable systems and delivering innovative solutions.
+    Versatile software engineer with 25 years of experience across full-stack development, DevOps, and AI/ML engineering.
+    Strong background in Generative AI, RAG pipelines, LangChain, Azure OpenAI, and machine learning (BHP, iCetana,
+    Woodside, Solana). Skilled in Python, Go, React, and cloud platforms (Azure, AWS). Passionate about building
+    scalable AI-powered systems and delivering innovative solutions in FinTech and data-driven domains.
 
 # Job Board URLs to scrape
 job_boards:
   seek:
     enabled: true
     search_urls:
-      # Remote jobs - full stack & react
-      - "https://www.seek.com.au/remote-jobs?keywords=react%20developer"
-      - "https://www.seek.com.au/remote-jobs?keywords=full%20stack%20developer"
-      - "https://www.seek.com.au/remote-jobs?keywords=frontend%20developer"
+      # Nationwide (includes remote) - full stack & react
+      - "https://www.seek.com.au/jobs?keywords=react%20developer"
+      - "https://www.seek.com.au/jobs?keywords=full%20stack%20developer"
+      - "https://www.seek.com.au/jobs?keywords=frontend%20developer"
+      # Nationwide (includes remote) - AI Engineer
+      - "https://www.seek.com.au/jobs?keywords=ai%20engineer"
+      - "https://www.seek.com.au/jobs?keywords=machine%20learning%20engineer"
+      - "https://www.seek.com.au/jobs?keywords=generative%20ai%20engineer"
       # Perth onsite
       - "https://www.seek.com.au/jobs?keywords=react%20developer&where=Perth+WA"
       - "https://www.seek.com.au/jobs?keywords=full%20stack%20developer&where=Perth+WA"
       - "https://www.seek.com.au/jobs?keywords=frontend%20developer&where=Perth+WA"
+      - "https://www.seek.com.au/jobs?keywords=ai%20engineer&where=Perth+WA"
       # Melbourne onsite
       - "https://www.seek.com.au/jobs?keywords=react%20developer&where=Melbourne+VIC"
       - "https://www.seek.com.au/jobs?keywords=full%20stack%20developer&where=Melbourne+VIC"
       - "https://www.seek.com.au/jobs?keywords=frontend%20developer&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=ai%20engineer&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=machine%20learning%20engineer&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=generative%20ai%20engineer&where=Melbourne+VIC"
 
   linkedin:
     enabled: true
@@ -87,12 +102,19 @@ job_boards:
       # Remote (f_WT=2)
       - "https://www.linkedin.com/jobs/search/?keywords=react%20developer&f_WT=2"
       - "https://www.linkedin.com/jobs/search/?keywords=full%20stack%20developer&f_WT=2"
+      - "https://www.linkedin.com/jobs/search/?keywords=ai%20engineer&f_WT=2"
+      - "https://www.linkedin.com/jobs/search/?keywords=machine%20learning%20engineer&f_WT=2"
+      - "https://www.linkedin.com/jobs/search/?keywords=generative%20ai%20engineer&f_WT=2"
       # Perth onsite
       - "https://www.linkedin.com/jobs/search/?keywords=react%20developer&location=Perth%2C%20Western%20Australia&f_WT=1"
       - "https://www.linkedin.com/jobs/search/?keywords=full%20stack%20developer&location=Perth%2C%20Western%20Australia&f_WT=1"
+      - "https://www.linkedin.com/jobs/search/?keywords=ai%20engineer&location=Perth%2C%20Western%20Australia&f_WT=1"
       # Melbourne onsite
       - "https://www.linkedin.com/jobs/search/?keywords=react%20developer&location=Melbourne%2C%20Victoria&f_WT=1"
       - "https://www.linkedin.com/jobs/search/?keywords=full%20stack%20developer&location=Melbourne%2C%20Victoria&f_WT=1"
+      - "https://www.linkedin.com/jobs/search/?keywords=ai%20engineer&location=Melbourne%2C%20Victoria&f_WT=1"
+      - "https://www.linkedin.com/jobs/search/?keywords=machine%20learning%20engineer&location=Melbourne%2C%20Victoria&f_WT=1"
+      - "https://www.linkedin.com/jobs/search/?keywords=generative%20ai%20engineer&location=Melbourne%2C%20Victoria&f_WT=1"
 
   indeed:
     enabled: true
@@ -100,9 +122,16 @@ job_boards:
       # Remote
       - "https://au.indeed.com/jobs?q=react+developer&sc=0kf%3Aattr%28DSQF7%29%3B"
       - "https://au.indeed.com/jobs?q=full+stack+developer&sc=0kf%3Aattr%28DSQF7%29%3B"
+      - "https://au.indeed.com/jobs?q=ai+engineer&sc=0kf%3Aattr%28DSQF7%29%3B"
+      - "https://au.indeed.com/jobs?q=machine+learning+engineer&sc=0kf%3Aattr%28DSQF7%29%3B"
+      - "https://au.indeed.com/jobs?q=generative+ai+engineer&sc=0kf%3Aattr%28DSQF7%29%3B"
       # Perth onsite
       - "https://au.indeed.com/jobs?q=react+developer&l=Perth%2C+WA"
       - "https://au.indeed.com/jobs?q=full+stack+developer&l=Perth%2C+WA"
+      - "https://au.indeed.com/jobs?q=ai+engineer&l=Perth%2C+WA"
       # Melbourne onsite
       - "https://au.indeed.com/jobs?q=react+developer&l=Melbourne%2C+VIC"
       - "https://au.indeed.com/jobs?q=full+stack+developer&l=Melbourne%2C+VIC"
+      - "https://au.indeed.com/jobs?q=ai+engineer&l=Melbourne%2C+VIC"
+      - "https://au.indeed.com/jobs?q=machine+learning+engineer&l=Melbourne%2C+VIC"
+      - "https://au.indeed.com/jobs?q=generative+ai+engineer&l=Melbourne%2C+VIC"

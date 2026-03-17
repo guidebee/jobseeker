@@ -32,6 +32,8 @@ func NewScraper(delayMs int) *Scraper {
 	}
 }
 
+const browserUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
+
 // newCollector creates a fresh Colly collector for the given allowed domains.
 // Each Scrape* method creates its own collector so OnHTML handlers never
 // accumulate across multiple calls.
@@ -39,24 +41,39 @@ func (s *Scraper) newCollector(domains ...string) *colly.Collector {
 	c := colly.NewCollector(
 		colly.AllowedDomains(domains...),
 		colly.Async(true),
-		colly.UserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"),
+		colly.UserAgent(browserUA),
 	)
 
 	c.OnRequest(func(r *colly.Request) {
 		log.Printf("Visiting: %s", r.URL)
+
+		// Common modern-browser headers (Sec-Fetch-* are required by many sites)
+		r.Headers.Set("Upgrade-Insecure-Requests", "1")
+		r.Headers.Set("Sec-Fetch-Dest", "document")
+		r.Headers.Set("Sec-Fetch-Mode", "navigate")
+		r.Headers.Set("Sec-Fetch-User", "?1")
+		r.Headers.Set("Sec-CH-UA", `"Chromium";v="134", "Google Chrome";v="134", "Not-A.Brand";v="99"`)
+		r.Headers.Set("Sec-CH-UA-Mobile", "?0")
+		r.Headers.Set("Sec-CH-UA-Platform", `"Windows"`)
 
 		reqURL := r.URL.String()
 		switch {
 		case strings.Contains(reqURL, "indeed.com"):
 			r.Headers.Set("Referer", "https://au.indeed.com/")
 			r.Headers.Set("Origin", "https://au.indeed.com")
-			r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
-			r.Headers.Set("Accept-Language", "en-US,en;q=0.9")
+			r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
+			r.Headers.Set("Accept-Language", "en-AU,en;q=0.9")
+			r.Headers.Set("Sec-Fetch-Site", "same-origin")
 		case strings.Contains(reqURL, "seek.com.au"):
 			r.Headers.Set("Referer", "https://www.seek.com.au/")
 			r.Headers.Set("Origin", "https://www.seek.com.au")
-			r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+			r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
 			r.Headers.Set("Accept-Language", "en-AU,en;q=0.9")
+			r.Headers.Set("Sec-Fetch-Site", "same-origin")
+		default:
+			r.Headers.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
+			r.Headers.Set("Accept-Language", "en-AU,en;q=0.9")
+			r.Headers.Set("Sec-Fetch-Site", "none")
 		}
 	})
 
@@ -272,7 +289,7 @@ func (s *Scraper) fetchLinkedInDescription(jobID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("User-Agent", browserUA)
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "en-AU,en;q=0.9")
 	req.Header.Set("Referer", "https://www.linkedin.com/jobs/search/")
