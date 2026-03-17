@@ -71,6 +71,9 @@ type Job struct {
 	Status        string `gorm:"index"` // "discovered", "recommended", "approved", "applied", "rejected"
 	AppliedAt     *time.Time
 	CoverLetter   string `gorm:"type:text"`
+
+	// Email notification tracking
+	EmailedAt *time.Time `gorm:"index"` // Set when job is included in a daily email digest
 }
 
 // Application tracks submitted job applications
