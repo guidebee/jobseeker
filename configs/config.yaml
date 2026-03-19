@@ -1,137 +1,248 @@
 # Your Professional Profile
+
 profile:
   name: "James Shen"
   email: "james.shen@guidebee.com"
-  phone: "+61 401 xxx xx 8"
+  phone: "+61 401 908 338"
   location: "Melbourne, VIC"
 
-  # Your skills (used for job matching)
-  skills:
-    - React
-    - JavaScript
-    - TypeScript
-    - Node.js
-    - Python
-    - Go
-    - DevOps
-    - Docker
-    - Kubernetes
-    - AWS
-    - Azure
-    - Azure AI Studio
-    - Azure OpenAI
-    - CI/CD
-    - Data Science
-    - Machine Learning
-    - Generative AI
-    - RAG
-    - LangChain
-    - CrewAI
-    - FinTech
-    - PostgreSQL
-    - MongoDB
-    - REST APIs
-    - GraphQL
+# Your skills (used for job matching)
+skills:
+  # Full-Stack
+  - React
+  - Angular
+  - JavaScript
+  - TypeScript
+  - Node.js
+  - ".NET Core"
+  - "C#"
+  - Python
+  - Go
+  - Rust
+  - Java
 
-  # Years of experience in key areas
-  experience:
-    total_years: 25
-    backend_years: 15
-    frontend_years: 10
-    devops_years: 8
+  # AI & Machine Learning
+  - "Generative AI"
+  - "Agentic AI"
+  - RAG
+  - LangChain
+  - LangGraph
+  - CrewAI
+  - "MCP (Model Context Protocol)"
+  - "Azure OpenAI"
+  - "Azure AI Foundry"
+  - "Azure AI Studio"
+  - "Machine Learning"
+  - "Data Science"
+  - "Signal Processing"
+  - "Computer Vision"
+  - PyTorch
+  - TensorFlow
+  - "Reinforcement Learning"
 
-  # Job preferences
-  preferences:
-    job_types:
-      - "Full-time"
-      - "Contract"
-    work_arrangements:
-      - "Remote"
-      - "On-site"
-      - "Hybrid"
+  # Cloud & DevOps
+  - AWS
+  - Azure
+  - GCP
+  - Docker
+  - Kubernetes
+  - DevOps
+  - "CI/CD"
+  - Terraform
+  - Ansible
+  - Prometheus
+  - Grafana
 
-    # Permanent role salary preferences (annual)
-    salary_min: 180000
+  # Microsoft Dynamics 365 & Power Platform
+  - "Dynamics 365"
+  - "Power Platform"
+  - "Power Apps"
+  - "Power Automate"
+  - "Power Pages"
+  - Dataverse
 
-    # Contract rate preferences
-    contract:
-      hourly_rate_min: 100  # AUD per hour
-      daily_rate_min: 800   # AUD per day
+  # Data
+  - "SQL Server"
+  - PostgreSQL
+  - MongoDB
+  - Redis
+  - Firebase
+  - Databricks
 
-    locations:
-      - "Remote"
-      - "Perth, WA"
-      - "Melbourne, VIC"
+  # Integration & Architecture
+  - "REST APIs"
+  - GraphQL
+  - gRPC
+  - "Azure Service Bus"
+  - "NATS JetStream"
+  - BizTalk
+  - TOGAF
 
-  # Your professional summary
-  summary: |
-    Versatile software engineer with 25 years of experience across full-stack development, DevOps, and AI/ML engineering.
-    Strong background in Generative AI, RAG pipelines, LangChain, Azure OpenAI, and machine learning (BHP, iCetana,
-    Woodside, Solana). Skilled in Python, Go, React, and cloud platforms (Azure, AWS). Passionate about building
-    scalable AI-powered systems and delivering innovative solutions in FinTech and data-driven domains.
+  # FinTech & Blockchain
+  - FinTech
+  - Solana
+  - Blockchain
+  - "HFT Systems"
+
+# Years of experience in key areas
+experience:
+  total_years: 25
+  backend_years: 15
+  frontend_years: 10
+  devops_years: 8
+  ai_ml_years: 8
+  dynamics365_years: 5
+
+# Job preferences
+preferences:
+  job_types:
+    - "Full-time"
+    - "Contract"
+  work_arrangements:
+    - "Remote"
+    - "On-site"
+    - "Hybrid"
+
+# Permanent role salary preferences (annual)
+salary_min: 180000
+
+# Contract rate preferences
+contract:
+  hourly_rate_min: 110       # AUD per hour
+  daily_rate_min: 850        # AUD per day
+  ai_engineering_daily_min: 950  # AUD per day for AI engineering roles
+
+# Target locations (Perth retained until relocation completes ~April 2026; remove Perth onsite URLs post-move)
+locations:
+  - "Remote"
+  - "Melbourne, VIC"
+  - "Perth, WA"   # Remove after relocation
+
+# Your professional summary (used by AI scoring — leads with strongest differentiators)
+summary: |
+  Senior AI engineer and full-stack architect with 25 years delivering production AI systems:
+  agentic LLM gateways (OpenClaw), RAG pipelines, computer vision (iCetana), acoustic ML
+  (BHP predictive maintenance), and data science platforms (Woodside). Expert in Python, Go,
+  Azure OpenAI, LangChain, LangGraph, and MCP. Full-stack: React, Angular, .NET Core, Node.js,
+  TypeScript. Cloud: Azure (AI Foundry, Service Bus, DevOps), AWS (Solutions Architect certified),
+  GCP. Microsoft Dynamics 365 / Power Platform PL-400 certified with enterprise CSBP delivery.
+  Proven contractor across government, mining, agriculture, defence, and fintech. Relocating to
+  Melbourne. Open to contract and permanent roles.
 
 # Job Board URLs to scrape
+# NOTE: Perth onsite URLs marked for removal after Melbourne relocation (~April 2026)
 job_boards:
+
   seek:
     enabled: true
     search_urls:
-      # Nationwide (includes remote) - full stack & react
-      - "https://www.seek.com.au/jobs?keywords=react%20developer"
-      - "https://www.seek.com.au/jobs?keywords=full%20stack%20developer"
-      - "https://www.seek.com.au/jobs?keywords=frontend%20developer"
-      # Nationwide (includes remote) - AI Engineer
-      - "https://www.seek.com.au/jobs?keywords=ai%20engineer"
-      - "https://www.seek.com.au/jobs?keywords=machine%20learning%20engineer"
-      - "https://www.seek.com.au/jobs?keywords=generative%20ai%20engineer"
-      # Perth onsite
-      - "https://www.seek.com.au/jobs?keywords=react%20developer&where=Perth+WA"
-      - "https://www.seek.com.au/jobs?keywords=full%20stack%20developer&where=Perth+WA"
-      - "https://www.seek.com.au/jobs?keywords=frontend%20developer&where=Perth+WA"
-      - "https://www.seek.com.au/jobs?keywords=ai%20engineer&where=Perth+WA"
-      # Melbourne onsite
-      - "https://www.seek.com.au/jobs?keywords=react%20developer&where=Melbourne+VIC"
-      - "https://www.seek.com.au/jobs?keywords=full%20stack%20developer&where=Melbourne+VIC"
-      - "https://www.seek.com.au/jobs?keywords=frontend%20developer&where=Melbourne+VIC"
-      - "https://www.seek.com.au/jobs?keywords=ai%20engineer&where=Melbourne+VIC"
-      - "https://www.seek.com.au/jobs?keywords=machine%20learning%20engineer&where=Melbourne+VIC"
-      - "https://www.seek.com.au/jobs?keywords=generative%20ai%20engineer&where=Melbourne+VIC"
+
+      # ── AI Engineering (nationwide / remote) ───────────────────────────────
+      - "https://www.seek.com.au/jobs?keywords=ai+engineer"
+      - "https://www.seek.com.au/jobs?keywords=machine+learning+engineer"
+      - "https://www.seek.com.au/jobs?keywords=generative+ai+engineer"
+      - "https://www.seek.com.au/jobs?keywords=agentic+ai+engineer"
+      - "https://www.seek.com.au/jobs?keywords=llm+engineer"
+      - "https://www.seek.com.au/jobs?keywords=ai+architect"
+
+      # ── Full-Stack / React (nationwide / remote) ───────────────────────────
+      - "https://www.seek.com.au/jobs?keywords=react+developer"
+      - "https://www.seek.com.au/jobs?keywords=full+stack+developer"
+      - "https://www.seek.com.au/jobs?keywords=frontend+developer"
+
+      # ── Melbourne onsite ───────────────────────────────────────────────────
+      - "https://www.seek.com.au/jobs?keywords=ai+engineer&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=machine+learning+engineer&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=generative+ai+engineer&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=agentic+ai+engineer&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=llm+engineer&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=ai+architect&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=ai+technical+lead&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=react+developer&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=full+stack+developer&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=frontend+developer&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=dotnet+developer&where=Melbourne+VIC"
+
+      # ── D365 / Power Platform Melbourne (low competition, high win rate) ───
+      - "https://www.seek.com.au/jobs?keywords=dynamics+365+developer&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=power+platform+developer&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=dynamics+crm+developer&where=Melbourne+VIC"
+
+      # ── Data / Contract sweet spot Melbourne ──────────────────────────────
+      - "https://www.seek.com.au/jobs?keywords=data+scientist+contract&where=Melbourne+VIC"
+      - "https://www.seek.com.au/jobs?keywords=databricks+engineer&where=Melbourne+VIC"
+
+      # ── Perth onsite (REMOVE AFTER RELOCATION ~April 2026) ─────────────────
+      - "https://www.seek.com.au/jobs?keywords=react+developer&where=Perth+WA"
+      - "https://www.seek.com.au/jobs?keywords=full+stack+developer&where=Perth+WA"
+      - "https://www.seek.com.au/jobs?keywords=ai+engineer&where=Perth+WA"
+      - "https://www.seek.com.au/jobs?keywords=dynamics+365+developer&where=Perth+WA"
 
   linkedin:
     enabled: true
     search_urls:
-      # Remote (f_WT=2)
-      - "https://www.linkedin.com/jobs/search/?keywords=react%20developer&f_WT=2"
-      - "https://www.linkedin.com/jobs/search/?keywords=full%20stack%20developer&f_WT=2"
-      - "https://www.linkedin.com/jobs/search/?keywords=ai%20engineer&f_WT=2"
-      - "https://www.linkedin.com/jobs/search/?keywords=machine%20learning%20engineer&f_WT=2"
-      - "https://www.linkedin.com/jobs/search/?keywords=generative%20ai%20engineer&f_WT=2"
-      # Perth onsite
-      - "https://www.linkedin.com/jobs/search/?keywords=react%20developer&location=Perth%2C%20Western%20Australia&f_WT=1"
-      - "https://www.linkedin.com/jobs/search/?keywords=full%20stack%20developer&location=Perth%2C%20Western%20Australia&f_WT=1"
-      - "https://www.linkedin.com/jobs/search/?keywords=ai%20engineer&location=Perth%2C%20Western%20Australia&f_WT=1"
-      # Melbourne onsite
+
+      # ── Remote ANZ only (geoId=101452733 restricts to Australia) ──────────
+      - "https://www.linkedin.com/jobs/search/?keywords=react%20developer&f_WT=2&geoId=101452733"
+      - "https://www.linkedin.com/jobs/search/?keywords=full%20stack%20developer&f_WT=2&geoId=101452733"
+      - "https://www.linkedin.com/jobs/search/?keywords=ai%20engineer&f_WT=2&geoId=101452733"
+      - "https://www.linkedin.com/jobs/search/?keywords=machine%20learning%20engineer&f_WT=2&geoId=101452733"
+      - "https://www.linkedin.com/jobs/search/?keywords=generative%20ai%20engineer&f_WT=2&geoId=101452733"
+      - "https://www.linkedin.com/jobs/search/?keywords=agentic%20ai&f_WT=2&geoId=101452733"
+      - "https://www.linkedin.com/jobs/search/?keywords=llm%20engineer&f_WT=2&geoId=101452733"
+
+      # ── Melbourne onsite ───────────────────────────────────────────────────
       - "https://www.linkedin.com/jobs/search/?keywords=react%20developer&location=Melbourne%2C%20Victoria&f_WT=1"
       - "https://www.linkedin.com/jobs/search/?keywords=full%20stack%20developer&location=Melbourne%2C%20Victoria&f_WT=1"
       - "https://www.linkedin.com/jobs/search/?keywords=ai%20engineer&location=Melbourne%2C%20Victoria&f_WT=1"
       - "https://www.linkedin.com/jobs/search/?keywords=machine%20learning%20engineer&location=Melbourne%2C%20Victoria&f_WT=1"
       - "https://www.linkedin.com/jobs/search/?keywords=generative%20ai%20engineer&location=Melbourne%2C%20Victoria&f_WT=1"
+      - "https://www.linkedin.com/jobs/search/?keywords=agentic%20ai&location=Melbourne%2C%20Victoria&f_WT=1"
+      - "https://www.linkedin.com/jobs/search/?keywords=ai%20architect&location=Melbourne%2C%20Victoria&f_WT=1"
+      - "https://www.linkedin.com/jobs/search/?keywords=ai%20technical%20lead&location=Melbourne%2C%20Victoria&f_WT=1"
+      - "https://www.linkedin.com/jobs/search/?keywords=dotnet%20developer&location=Melbourne%2C%20Victoria&f_WT=1"
+
+      # ── D365 / Power Platform Melbourne ───────────────────────────────────
+      - "https://www.linkedin.com/jobs/search/?keywords=dynamics%20365&location=Melbourne%2C%20Victoria&f_WT=1"
+      - "https://www.linkedin.com/jobs/search/?keywords=power%20platform%20developer&location=Melbourne%2C%20Victoria&f_WT=1"
+
+      # ── Perth onsite (REMOVE AFTER RELOCATION ~April 2026) ─────────────────
+      - "https://www.linkedin.com/jobs/search/?keywords=react%20developer&location=Perth%2C%20Western%20Australia&f_WT=1"
+      - "https://www.linkedin.com/jobs/search/?keywords=full%20stack%20developer&location=Perth%2C%20Western%20Australia&f_WT=1"
+      - "https://www.linkedin.com/jobs/search/?keywords=ai%20engineer&location=Perth%2C%20Western%20Australia&f_WT=1"
 
   indeed:
     enabled: true
     search_urls:
-      # Remote
-      - "https://au.indeed.com/jobs?q=react+developer&sc=0kf%3Aattr%28DSQF7%29%3B"
-      - "https://au.indeed.com/jobs?q=full+stack+developer&sc=0kf%3Aattr%28DSQF7%29%3B"
+
+      # ── Remote ─────────────────────────────────────────────────────────────
       - "https://au.indeed.com/jobs?q=ai+engineer&sc=0kf%3Aattr%28DSQF7%29%3B"
       - "https://au.indeed.com/jobs?q=machine+learning+engineer&sc=0kf%3Aattr%28DSQF7%29%3B"
       - "https://au.indeed.com/jobs?q=generative+ai+engineer&sc=0kf%3Aattr%28DSQF7%29%3B"
-      # Perth onsite
-      - "https://au.indeed.com/jobs?q=react+developer&l=Perth%2C+WA"
-      - "https://au.indeed.com/jobs?q=full+stack+developer&l=Perth%2C+WA"
-      - "https://au.indeed.com/jobs?q=ai+engineer&l=Perth%2C+WA"
-      # Melbourne onsite
-      - "https://au.indeed.com/jobs?q=react+developer&l=Melbourne%2C+VIC"
-      - "https://au.indeed.com/jobs?q=full+stack+developer&l=Melbourne%2C+VIC"
+      - "https://au.indeed.com/jobs?q=agentic+ai+engineer&sc=0kf%3Aattr%28DSQF7%29%3B"
+      - "https://au.indeed.com/jobs?q=react+developer&sc=0kf%3Aattr%28DSQF7%29%3B"
+      - "https://au.indeed.com/jobs?q=full+stack+developer&sc=0kf%3Aattr%28DSQF7%29%3B"
+
+      # ── Melbourne onsite ───────────────────────────────────────────────────
       - "https://au.indeed.com/jobs?q=ai+engineer&l=Melbourne%2C+VIC"
       - "https://au.indeed.com/jobs?q=machine+learning+engineer&l=Melbourne%2C+VIC"
       - "https://au.indeed.com/jobs?q=generative+ai+engineer&l=Melbourne%2C+VIC"
+      - "https://au.indeed.com/jobs?q=agentic+ai+engineer&l=Melbourne%2C+VIC"
+      - "https://au.indeed.com/jobs?q=llm+engineer&l=Melbourne%2C+VIC"
+      - "https://au.indeed.com/jobs?q=ai+architect&l=Melbourne%2C+VIC"
+      - "https://au.indeed.com/jobs?q=react+developer&l=Melbourne%2C+VIC"
+      - "https://au.indeed.com/jobs?q=full+stack+developer&l=Melbourne%2C+VIC"
+      - "https://au.indeed.com/jobs?q=dotnet+developer&l=Melbourne%2C+VIC"
+
+      # ── D365 / Power Platform Melbourne ───────────────────────────────────
+      - "https://au.indeed.com/jobs?q=dynamics+365+developer&l=Melbourne%2C+VIC"
+      - "https://au.indeed.com/jobs?q=power+platform+developer&l=Melbourne%2C+VIC"
+
+      # ── Data / Contract sweet spot Melbourne ──────────────────────────────
+      - "https://au.indeed.com/jobs?q=databricks+engineer&l=Melbourne%2C+VIC"
+      - "https://au.indeed.com/jobs?q=data+scientist+contract&l=Melbourne%2C+VIC"
+
+      # ── Perth onsite (REMOVE AFTER RELOCATION ~April 2026) ─────────────────
+      - "https://au.indeed.com/jobs?q=react+developer&l=Perth%2C+WA"
+      - "https://au.indeed.com/jobs?q=full+stack+developer&l=Perth%2C+WA"
+      - "https://au.indeed.com/jobs?q=ai+engineer&l=Perth%2C+WA"
