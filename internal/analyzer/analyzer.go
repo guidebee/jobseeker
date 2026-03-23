@@ -101,10 +101,10 @@ func (a *Analyzer) buildAnalysisPrompt(job *database.Job) string {
 	salaryPref := ""
 	if job.JobType == "contract" {
 		salaryPref = fmt.Sprintf("Contract rates: $%d+/hour or $%d+/day",
-			a.profile.Profile.Preferences.Contract.HourlyRateMin,
-			a.profile.Profile.Preferences.Contract.DailyRateMin)
+			a.profile.Contract.HourlyRateMin,
+			a.profile.Contract.DailyRateMin)
 	} else {
-		salaryPref = fmt.Sprintf("Permanent salary: $%d+/year", a.profile.Profile.Preferences.SalaryMin)
+		salaryPref = fmt.Sprintf("Permanent salary: $%d+/year", a.profile.SalaryMin)
 	}
 
 	// Use resume content if available, otherwise fall back to config
@@ -156,8 +156,8 @@ Respond ONLY with valid JSON in this exact format:
 }`,
 		truncate(selectedResume.Content, 2000), // Limit resume length
 		salaryPref,
-		strings.Join(a.profile.Profile.Preferences.JobTypes, ", "),
-		strings.Join(a.profile.Profile.Preferences.Locations, ", "),
+		strings.Join(a.profile.Preferences.JobTypes, ", "),
+		strings.Join(a.profile.Locations, ", "),
 		job.Title,
 		job.Company,
 		job.Location,
@@ -205,14 +205,14 @@ Respond ONLY with valid JSON in this exact format:
   "cons": ["concern 1", "concern 2"]
 }`,
 		a.profile.GetSkillsString(),
-		a.profile.Profile.Experience.TotalYears,
-		a.profile.Profile.Experience.BackendYears,
-		a.profile.Profile.Experience.FrontendYears,
-		a.profile.Profile.Experience.DevOpsYears,
+		a.profile.Experience.TotalYears,
+		a.profile.Experience.BackendYears,
+		a.profile.Experience.FrontendYears,
+		a.profile.Experience.DevOpsYears,
 		a.profile.Profile.Location,
 		salaryPref,
-		strings.Join(a.profile.Profile.Preferences.JobTypes, ", "),
-		a.profile.Profile.Summary,
+		strings.Join(a.profile.Preferences.JobTypes, ", "),
+		a.profile.Summary,
 		job.Title,
 		job.Company,
 		job.Location,

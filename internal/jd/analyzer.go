@@ -76,11 +76,11 @@ func (a *JDAnalyzer) buildAnalysisPrompt(jd *JobDescription) string {
 Experience: %d years total (%d backend, %d frontend, %d devops)
 Summary: %s`,
 			a.profile.GetSkillsString(),
-			a.profile.Profile.Experience.TotalYears,
-			a.profile.Profile.Experience.BackendYears,
-			a.profile.Profile.Experience.FrontendYears,
-			a.profile.Profile.Experience.DevOpsYears,
-			a.profile.Profile.Summary,
+			a.profile.Experience.TotalYears,
+			a.profile.Experience.BackendYears,
+			a.profile.Experience.FrontendYears,
+			a.profile.Experience.DevOpsYears,
+			a.profile.Summary,
 		)
 	}
 
@@ -116,8 +116,8 @@ Respond ONLY with valid JSON in this exact format:
   "missing_skills": ["skill 1", "skill 2"]
 }`,
 		resumeContent,
-		strings.Join(a.profile.Profile.Preferences.JobTypes, ", "),
-		strings.Join(a.profile.Profile.Preferences.Locations, ", "),
+		strings.Join(a.profile.Preferences.JobTypes, ", "),
+		strings.Join(a.profile.Locations, ", "),
 		truncate(jd.Content, 4000),
 	)
 }
@@ -152,8 +152,8 @@ func (a *JDAnalyzer) GenerateCoverLetter(jd *JobDescription, userInput string) (
 Experience: %d years
 Summary: %s`,
 			a.profile.GetSkillsString(),
-			a.profile.Profile.Experience.TotalYears,
-			a.profile.Profile.Summary,
+			a.profile.Experience.TotalYears,
+			a.profile.Summary,
 		)
 	}
 
@@ -247,8 +247,8 @@ func (a *JDAnalyzer) RefineCoverLetter(jd *JobDescription, previousLetter string
 Experience: %d years
 Summary: %s`,
 			a.profile.GetSkillsString(),
-			a.profile.Profile.Experience.TotalYears,
-			a.profile.Profile.Summary,
+			a.profile.Experience.TotalYears,
+			a.profile.Summary,
 		)
 	}
 

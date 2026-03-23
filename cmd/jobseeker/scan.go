@@ -191,8 +191,8 @@ func generateDynamicURLs(prof *profile.Profile) []string {
 
 	// Get preferred location from config
 	location := "melbourne" // Default
-	if len(prof.Profile.Preferences.Locations) > 0 {
-		location = prof.Profile.Preferences.Locations[0]
+	if len(prof.Locations) > 0 {
+		location = prof.Locations[0]
 	}
 
 	// Generate URLs
