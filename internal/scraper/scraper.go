@@ -87,6 +87,7 @@ func (s *Scraper) newCollector(domains ...string) *colly.Collector {
 // ScrapeSeek scrapes job listings from SEEK
 func (s *Scraper) ScrapeSeek(searchURL string) ([]*database.Job, error) {
 	var jobs []*database.Job
+	seen := make(map[string]bool) // dedup within a single page (promoted vs standard cards)
 
 	c := s.newCollector("seek.com.au", "www.seek.com.au")
 	c.Limit(&colly.LimitRule{ //nolint:errcheck
@@ -155,7 +156,8 @@ func (s *Scraper) ScrapeSeek(searchURL string) ([]*database.Job, error) {
 		job.ExternalID = extractJobID(job.URL)
 		job.JobType = database.DetectJobType(job.Title, job.Salary, job.URL)
 
-		if job.Title != "" && job.URL != "" {
+		if job.Title != "" && job.URL != "" && !seen[job.ExternalID] {
+			seen[job.ExternalID] = true
 			jobs = append(jobs, job)
 			log.Printf("Found job: %s at %s", job.Title, job.Company)
 		}
@@ -214,9 +216,8 @@ func (s *Scraper) fetchLinkedInJobList(apiURL string) ([]*database.Job, error) {
 		Parallelism: 1,
 	})
 
-	// Override OnRequest to add LinkedIn-specific headers
+	// Add LinkedIn-specific headers (OnRequest from newCollector already logs the URL)
 	c.OnRequest(func(r *colly.Request) {
-		log.Printf("Visiting: %s", r.URL)
 		r.Headers.Set("Referer", "https://www.linkedin.com/jobs/search/")
 		r.Headers.Set("Accept", "text/html,application/xhtml+xml,*/*;q=0.8")
 		r.Headers.Set("Accept-Language", "en-AU,en;q=0.9")
@@ -584,7 +585,10 @@ func extractJobID(rawURL string) string {
 	if strings.Contains(rawURL, "seek.com.au") {
 		for i, part := range parts {
 			if part == "job" && i+1 < len(parts) {
-				return "seek-" + parts[i+1]
+				// Strip query parameters so the same job isn't stored
+				// under two different IDs (e.g. type=promoted vs type=standard)
+				jobID := strings.Split(parts[i+1], "?")[0]
+				return "seek-" + jobID
 			}
 		}
 		return "seek-" + rawURL
