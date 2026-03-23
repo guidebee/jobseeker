@@ -223,10 +223,18 @@ Respond ONLY with valid JSON in this exact format:
 	)
 }
 
-// parseAnalysisResponse extracts the JSON from Claude's response
+// parseAnalysisResponse extracts the JSON from the AI response.
+// MiniMax-M2.5 is a reasoning model that prefixes its answer with a
+// <think>...</think> block; strip that before looking for JSON.
 func (a *Analyzer) parseAnalysisResponse(response string) (*AnalysisResult, error) {
-	// Claude might wrap JSON in markdown code blocks, so clean it up
 	cleaned := strings.TrimSpace(response)
+
+	// Strip <think>...</think> reasoning block (MiniMax-M2.5 reasoning model)
+	if idx := strings.Index(cleaned, "</think>"); idx != -1 {
+		cleaned = strings.TrimSpace(cleaned[idx+len("</think>"):])
+	}
+
+	// Strip optional markdown code fences
 	cleaned = strings.TrimPrefix(cleaned, "```json")
 	cleaned = strings.TrimPrefix(cleaned, "```")
 	cleaned = strings.TrimSuffix(cleaned, "```")
