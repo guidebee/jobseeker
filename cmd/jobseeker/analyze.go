@@ -55,7 +55,15 @@ func runAnalyze(cmd *cobra.Command, args []string) {
 	resumesDir := "./resumes"
 	err = a.LoadResumes(resumesDir)
 	if err != nil {
-		fmt.Printf("No resumes found, using config.yaml profile (%v)\n", err)
+		// Fall back to LinkedIn profile cached during init
+		db := database.GetDB()
+		var profileData database.ProfileData
+		if dbErr := db.Where("user_id = ?", user.ID).First(&profileData).Error; dbErr == nil && profileData.LinkedInProfile != "" {
+			fmt.Println("No .docx resumes found — using cached LinkedIn profile as CV")
+			a.LoadLinkedInProfile(profileData.LinkedInProfile)
+		} else {
+			fmt.Printf("No resumes found, using config.yaml profile (%v)\n", err)
+		}
 	} else {
 		fmt.Println("✓ Using resume(s) for analysis")
 	}

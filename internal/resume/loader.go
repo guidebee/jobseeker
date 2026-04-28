@@ -124,3 +124,17 @@ func (r *Resume) GetSummary() string {
 	}
 	return r.Content[:500] + "..."
 }
+
+// LoadLinkedInAsResume creates a virtual Resume from a cached LinkedIn profile
+// text (as returned by Profile.FormatAsCV). It can be used as a CV substitute
+// when no .docx resumes are available.
+func LoadLinkedInAsResume(profileText string) *Resume {
+	if strings.TrimSpace(profileText) == "" {
+		return nil
+	}
+	return &Resume{
+		Filename: "linkedin_profile.txt",
+		Content:  profileText,
+		FilePath: "", // virtual — not on disk
+	}
+}

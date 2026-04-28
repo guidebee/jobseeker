@@ -52,6 +52,18 @@ func (a *Analyzer) LoadResumes(resumesDir string) error {
 	return nil
 }
 
+// LoadLinkedInProfile adds a virtual resume built from a cached LinkedIn profile
+// text. It is used as a CV substitute when no .docx resumes are available.
+func (a *Analyzer) LoadLinkedInProfile(profileText string) {
+	virtualResume := resume.LoadLinkedInAsResume(profileText)
+	if virtualResume == nil {
+		return
+	}
+	a.resumes = []*resume.Resume{virtualResume}
+	a.useResumes = true
+	log.Printf("Using LinkedIn profile as CV for analysis")
+}
+
 // UseResumes returns true if analyzer is using resumes
 func (a *Analyzer) UseResumes() bool {
 	return a.useResumes && len(a.resumes) > 0
