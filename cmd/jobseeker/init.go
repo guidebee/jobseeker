@@ -11,6 +11,7 @@ import (
 	"github.com/guidebee/jobseeker/internal/resume"
 	"github.com/guidebee/jobseeker/pkg/claude"
 	"github.com/guidebee/jobseeker/pkg/github"
+	linkedinpkg "github.com/guidebee/jobseeker/pkg/linkedin"
 	"github.com/spf13/cobra"
 )
 
@@ -129,24 +130,61 @@ func runInit(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// LinkedIn URL
+	// LinkedIn URL + profile fetch
 	linkedinURL := initLinkedInURL
 	if linkedinURL == "" {
 		linkedinURL = os.Getenv("LINKEDIN_URL")
 	}
 
+	var linkedinProfileText string
+	if linkedinURL != "" {
+		fmt.Printf("\nFetching LinkedIn profile: %s\n", linkedinURL)
+		liProfile, err := linkedinpkg.FetchProfile(linkedinURL)
+		if err != nil {
+			log.Printf("Warning: Failed to fetch LinkedIn profile: %v", err)
+		} else {
+			linkedinProfileText = liProfile.FormatAsCV()
+			fmt.Printf("✓ LinkedIn profile fetched: %s\n", liProfile.Name)
+			if liProfile.Headline != "" {
+				fmt.Printf("  Headline: %s\n", liProfile.Headline)
+			}
+			if len(liProfile.Experience) > 0 {
+				fmt.Printf("  Experience entries: %d\n", len(liProfile.Experience))
+			}
+			// If no resumes were loaded, extract keywords from the LinkedIn profile too
+			if len(resumes) == 0 && keywordsJSON == "" {
+				apiKey := os.Getenv("CLAUDE_API_KEY")
+				if apiKey != "" {
+					fmt.Println("  Extracting keywords from LinkedIn profile...")
+					claudeClient := claude.NewClient(apiKey)
+					virtualResume := resume.LoadLinkedInAsResume(linkedinProfileText)
+					if virtualResume != nil {
+						keywords, err := resume.ExtractKeywords(virtualResume, claudeClient)
+						if err != nil {
+							log.Printf("Warning: Failed to extract keywords from LinkedIn: %v", err)
+						} else {
+							fmt.Printf("  Primary skills: %v\n", keywords.PrimarySkills)
+							keywordsData, _ := json.Marshal(keywords)
+							keywordsJSON = string(keywordsData)
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// Save or update profile data
 	profileData := database.ProfileData{
-		UserID:         user.ID,
-		ResumesJSON:    string(resumesJSON),
-		GitHubRepos:    githubReposJSON,
-		GitHubUser:     githubUser,
-		LinkedInProfile: "", // Can be populated later with scraping
-		LinkedInURL:    linkedinURL,
-		SearchKeywords: keywordsJSON,
-		ResumesCount:   len(resumes),
-		LastInitAt:     time.Now(),
-		InitVersion:    "1.0",
+		UserID:          user.ID,
+		ResumesJSON:     string(resumesJSON),
+		GitHubRepos:     githubReposJSON,
+		GitHubUser:      githubUser,
+		LinkedInProfile: linkedinProfileText,
+		LinkedInURL:     linkedinURL,
+		SearchKeywords:  keywordsJSON,
+		ResumesCount:    len(resumes),
+		LastInitAt:      time.Now(),
+		InitVersion:     "1.0",
 	}
 
 	if result.Error == nil {

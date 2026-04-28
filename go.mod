@@ -3,17 +3,18 @@ module github.com/guidebee/jobseeker
 go 1.24.0
 
 require (
+	github.com/PuerkitoBio/goquery v1.5.1
 	github.com/glebarez/sqlite v1.10.0
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/joho/godotenv v1.5.1
 	github.com/nguyenthenguyen/docx v0.0.0-20230621112118-9c8e795a11db
 	github.com/spf13/cobra v1.8.0
+	github.com/xuri/excelize/v2 v2.10.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/gorm v1.25.5
 )
 
 require (
-	github.com/PuerkitoBio/goquery v1.5.1 // indirect
 	github.com/andybalholm/cascadia v1.2.0 // indirect
 	github.com/antchfx/htmlquery v1.2.3 // indirect
 	github.com/antchfx/xmlquery v1.2.4 // indirect
@@ -37,7 +38,6 @@ require (
 	github.com/temoto/robotstxt v1.1.1 // indirect
 	github.com/tiendc/go-deepcopy v1.7.1 // indirect
 	github.com/xuri/efp v0.0.1 // indirect
-	github.com/xuri/excelize/v2 v2.10.0 // indirect
 	github.com/xuri/nfp v0.0.2-0.20250530014748-2ddeb826f9a9 // indirect
 	golang.org/x/crypto v0.43.0 // indirect
 	golang.org/x/net v0.46.0 // indirect
