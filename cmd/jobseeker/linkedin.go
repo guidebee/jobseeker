@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/guidebee/jobseeker/pkg/browser"
+	claudepkg "github.com/guidebee/jobseeker/pkg/claude"
 	linkedinpkg "github.com/guidebee/jobseeker/pkg/linkedin"
 	"github.com/spf13/cobra"
 )
@@ -49,6 +51,14 @@ func runLinkedIn(cmd *cobra.Command, args []string) {
 	profile, err := linkedinpkg.FetchProfile(profileURL, pool)
 	if err != nil {
 		log.Fatalf("Failed to fetch profile: %v", err)
+	}
+
+	if apiKey := os.Getenv("CLAUDE_API_KEY"); apiKey != "" {
+		fmt.Println("Inferring skills via Claude AI...")
+		client := claudepkg.NewClient(apiKey)
+		if err := profile.InferSkills(client.SendMessage); err != nil {
+			log.Printf("Warning: could not infer skills: %v", err)
+		}
 	}
 
 	fmt.Println(profile.FormatAsCV())
