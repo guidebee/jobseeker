@@ -575,6 +575,83 @@ func extractSkills(doc *goquery.Document, p *Profile) {
 	})
 }
 
+// SkillInferrer is a function that sends a prompt to an LLM and returns the response.
+type SkillInferrer func(prompt string) (string, error)
+
+// InferSkills uses an LLM to extract skills from the profile's experience,
+// certifications, and projects when the LinkedIn skills section is unavailable.
+func (p *Profile) InferSkills(infer SkillInferrer) error {
+	if len(p.Skills) > 0 {
+		return nil // already have skills from HTML scraping
+	}
+
+	var sb strings.Builder
+	sb.WriteString("Based on the following professional profile data, extract a comprehensive list of technical and professional skills. ")
+	sb.WriteString("Return ONLY a JSON array of skill strings, no explanation. Example: [\"Go\", \"AWS\", \"Docker\"]\n\n")
+
+	if len(p.Experience) > 0 {
+		sb.WriteString("EXPERIENCE:\n")
+		for _, exp := range p.Experience {
+			if exp.Title != "" || exp.Company != "" {
+				sb.WriteString(fmt.Sprintf("- %s at %s\n", exp.Title, exp.Company))
+			}
+			if exp.Desc != "" {
+				sb.WriteString(fmt.Sprintf("  %s\n", exp.Desc))
+			}
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(p.Certifications) > 0 {
+		sb.WriteString("CERTIFICATIONS:\n")
+		for _, c := range p.Certifications {
+			sb.WriteString(fmt.Sprintf("- %s (%s)\n", c.Name, c.Issuer))
+		}
+		sb.WriteString("\n")
+	}
+
+	if len(p.Projects) > 0 {
+		sb.WriteString("PROJECTS:\n")
+		for _, proj := range p.Projects {
+			sb.WriteString(fmt.Sprintf("- %s: %s\n", proj.Name, proj.Desc))
+		}
+		sb.WriteString("\n")
+	}
+
+	if p.About != "" {
+		sb.WriteString("ABOUT:\n" + p.About + "\n")
+	}
+
+	raw, err := infer(sb.String())
+	if err != nil {
+		return fmt.Errorf("skill inference failed: %w", err)
+	}
+
+	// Strip markdown code fences if present.
+	raw = strings.TrimSpace(raw)
+	if idx := strings.Index(raw, "["); idx != -1 {
+		raw = raw[idx:]
+	}
+	if idx := strings.LastIndex(raw, "]"); idx != -1 {
+		raw = raw[:idx+1]
+	}
+
+	var skills []string
+	if err := json.Unmarshal([]byte(raw), &skills); err != nil {
+		return fmt.Errorf("failed to parse skill list: %w", err)
+	}
+
+	seen := make(map[string]bool)
+	for _, s := range skills {
+		s = strings.TrimSpace(s)
+		if s != "" && !seen[s] {
+			seen[s] = true
+			p.Skills = append(p.Skills, s)
+		}
+	}
+	return nil
+}
+
 // FormatAsCV converts the profile into a plain-text CV.
 func (p *Profile) FormatAsCV() string {
 	var sb strings.Builder
