@@ -592,6 +592,81 @@ Total: 8 jobs
 
 ---
 
+### `jobseeker linkedin` - Fetch LinkedIn Public Profile
+
+Fetches a public LinkedIn profile by user ID or URL, displays it as a structured CV, and automatically infers skills via Claude AI when `CLAUDE_API_KEY` is set (since LinkedIn hides the skills section from unauthenticated requests).
+
+**Usage:**
+```bash
+jobseeker linkedin <user-id>
+jobseeker linkedin <full-profile-url>
+```
+
+**Examples:**
+```bash
+jobseeker linkedin guidebee
+jobseeker linkedin john-doe-123456
+jobseeker linkedin https://www.linkedin.com/in/guidebee/
+```
+
+**Sample output:**
+```
+Fetching LinkedIn profile: https://www.linkedin.com/in/guidebee/
+
+Inferring skills via Claude AI...
+
+=== LinkedIn Profile (used as CV) ===
+
+NAME: James Shen
+LINKEDIN: https://www.linkedin.com/in/guidebee/
+
+EXPERIENCE:
+- Victorian Electoral Commission
+
+CERTIFICATIONS:
+- Xamarin Certified Mobile Developer — Xamarin (Dec 2016)
+- AWS Certified Solutions Architect -- Associate Level — Amazon Web Services
+- Introduction to Xamarin.Forms — Microsoft
+- MCPS: Microsoft Certified Professional — Microsoft
+- MCTS: Microsoft Biztalk Server 2010 — Microsoft
+- MCTS: Programming in HTML5 with JavaScript and CSS3 — Microsoft
+- Professional Scrum Master I — Scrum.org
+- Sitefinity Certificated Developer — Telerik
+- TOGAF 9 Certified — The Open Group
+- TOGAF 9 Foundation — The Open Group
+
+PROJECTS:
+- Solana Blockchain DeFi NFT
+  Solana blockchain DeFi ,NFT ,Token etc
+- asx_gym
+  OpenAI Gym environment for ASX stock market
+- Guidebee Map API
+  Guidebee Mobile GIS Engine for Java ME, Blackberry, Android, Windows Mobile etc.
+- Open source Guidebee Game Engine for Android
+  Guidebee Game Engine(GGE), whose core is based on libgdx ,but instead of trying to be a
+  cross-platform game visualization development framework, GGE is focus on Android platform
+  and provide much easier Game API interfaces and enforce game development best practices for
+  Android game developers.
+
+LANGUAGES:
+- Chinese (Native or bilingual proficiency)
+- English (Professional working proficiency)
+
+SKILLS:
+Xamarin, Xamarin.Forms, AWS, Solutions Architecture, Microsoft BizTalk Server, HTML5,
+JavaScript, CSS3, Scrum, Agile, Sitefinity, TOGAF, Enterprise Architecture, Solana,
+Blockchain, DeFi, NFT, OpenAI Gym, Python, Machine Learning, GIS, Mobile Development,
+Java ME, Blackberry, Android, Windows Mobile, Game Development, libgdx, Box2D,
+Entity Framework, .NET, C#
+```
+
+**Notes:**
+- Skills section is inferred by Claude AI from certifications, projects, and experience (LinkedIn hides skills for unauthenticated users)
+- Skills inference only runs when `CLAUDE_API_KEY` is set in `.env`
+- If LinkedIn blocks the request, the command falls back to a direct HTTP fetch
+
+---
+
 ### `jobseeker checkjd` - Analyze Recruiter Job Descriptions
 
 Analyzes job descriptions received directly from recruiters (typically via email as Word documents) and generates tailored cover letters with iterative refinement.
@@ -1768,6 +1843,7 @@ Error: failed to get MiniMax response
 | Command | Purpose | Key Flags |
 |---------|---------|-----------|
 | `jobseeker init` | Initialize profile and cache resumes | `--force`, `--github`, `--linkedin` |
+| `jobseeker linkedin` | Fetch LinkedIn profile + infer skills via Claude | `<user-id or URL>` |
 | `jobseeker scan` | Discover jobs from configured URLs | `--config`, `--database` |
 | `jobseeker analyze` | AI job matching with MiniMax | `--contract`, `--type` |
 | `jobseeker list` | View jobs from database | `--recommended`, `--contract`, `--type`, `--limit` |
