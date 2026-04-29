@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/guidebee/jobseeker/pkg/browser"
 )
 
 // Profile holds data scraped from a LinkedIn public profile page.
@@ -90,8 +91,16 @@ var (
 
 // FetchProfile fetches and parses a LinkedIn public profile.
 // profileURL should be of the form https://www.linkedin.com/in/<username>/
-func FetchProfile(profileURL string) (*Profile, error) {
-	body, err := fetchPage(profileURL)
+// Pass a non-nil pool to route through the stealth browser (recommended);
+// pass nil to fall back to a direct HTTP request.
+func FetchProfile(profileURL string, pool *browser.Pool) (*Profile, error) {
+	var body string
+	var err error
+	if pool != nil {
+		body, err = pool.FetchLinkedInHTML(profileURL)
+	} else {
+		body, err = fetchPage(profileURL)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -115,20 +124,16 @@ func FetchProfile(profileURL string) (*Profile, error) {
 	return profile, nil
 }
 
-// fetchPage fetches the page with up to 2 attempts.
-// 999 = definitive bot-block — do not retry.
-// 404/503 may be transient — retry once after a pause.
+// fetchPage is the direct HTTP fallback used when no browser pool is available.
 func fetchPage(url string) (string, error) {
 	body, err := doFetch(url)
 	if err == nil {
 		return body, nil
 	}
 	msg := err.Error()
-	// 999 is LinkedIn's hard bot-detection response; retrying makes it worse.
 	if strings.Contains(msg, "status 999") {
-		return "", fmt.Errorf("%w\nHint: LinkedIn has flagged this IP. Wait a few minutes before retrying", err)
+		return "", fmt.Errorf("%w\nHint: Chrome is not available; LinkedIn blocked the direct request", err)
 	}
-	// Retry once for genuinely transient codes.
 	if strings.Contains(msg, "status 404") || strings.Contains(msg, "status 503") || strings.Contains(msg, "status 429") {
 		fmt.Println("  Got transient error, retrying in 15s...")
 		time.Sleep(15 * time.Second)

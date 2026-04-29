@@ -9,6 +9,7 @@ import (
 
 	"github.com/guidebee/jobseeker/internal/database"
 	"github.com/guidebee/jobseeker/internal/resume"
+	"github.com/guidebee/jobseeker/pkg/browser"
 	"github.com/guidebee/jobseeker/pkg/claude"
 	"github.com/guidebee/jobseeker/pkg/github"
 	linkedinpkg "github.com/guidebee/jobseeker/pkg/linkedin"
@@ -139,7 +140,15 @@ func runInit(cmd *cobra.Command, args []string) {
 	var linkedinProfileText string
 	if linkedinURL != "" {
 		fmt.Printf("\nFetching LinkedIn profile: %s\n", linkedinURL)
-		liProfile, err := linkedinpkg.FetchProfile(linkedinURL)
+		liPool := browser.NewPool()
+		if err := liPool.Init(); err != nil {
+			log.Printf("Warning: could not start browser pool (%v) — falling back to direct HTTP", err)
+			liPool = nil
+		}
+		if liPool != nil {
+			defer liPool.Close()
+		}
+		liProfile, err := linkedinpkg.FetchProfile(linkedinURL, liPool)
 		if err != nil {
 			log.Printf("Warning: Failed to fetch LinkedIn profile: %v", err)
 		} else {
