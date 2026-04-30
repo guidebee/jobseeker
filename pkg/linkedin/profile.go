@@ -89,6 +89,22 @@ var (
 	showMoreRe = regexp.MustCompile(`(?i)\s*(show\s+more|show\s+less)\s*`)
 )
 
+// ParseHTML parses a LinkedIn profile from already-fetched HTML.
+// Use this when HTML is obtained externally (e.g. via the Puppeteer service).
+func ParseHTML(html, profileURL string) (*Profile, error) {
+	profile := &Profile{URL: profileURL}
+	if err := extractJSONLD(html, profile); err != nil {
+		_ = err
+	}
+	if err := extractHTML(html, profile); err != nil {
+		_ = err
+	}
+	if profile.Name == "" {
+		return nil, fmt.Errorf("could not extract profile data from HTML (LinkedIn may have blocked the request or returned a login wall)")
+	}
+	return profile, nil
+}
+
 // FetchProfile fetches and parses a LinkedIn public profile.
 // profileURL should be of the form https://www.linkedin.com/in/<username>/
 // Pass a non-nil pool to route through the stealth browser (recommended);

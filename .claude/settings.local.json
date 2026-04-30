@@ -17,7 +17,11 @@
       "WebFetch(domain:platform.minimaxi.com)",
       "WebFetch(domain:www.minimax.io)",
       "WebFetch(domain:platform.minimax.io)",
-      "WebFetch(domain:minimax-ai.chat)"
+      "WebFetch(domain:minimax-ai.chat)",
+      "Bash(go vet *)",
+      "Bash(npm install *)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(npx tsc *)"
     ],
     "deny": [],
     "ask": []

@@ -9,6 +9,7 @@ import (
 	"github.com/guidebee/jobseeker/pkg/browser"
 	claudepkg "github.com/guidebee/jobseeker/pkg/claude"
 	linkedinpkg "github.com/guidebee/jobseeker/pkg/linkedin"
+	puppeteerpkg "github.com/guidebee/jobseeker/pkg/puppeteer"
 	"github.com/spf13/cobra"
 )
 
@@ -38,19 +39,40 @@ func runLinkedIn(cmd *cobra.Command, args []string) {
 
 	fmt.Printf("Fetching LinkedIn profile: %s\n\n", profileURL)
 
-	// Initialise stealth browser pool.
-	pool := browser.NewPool()
-	if err := pool.Init(); err != nil {
-		log.Printf("Warning: could not start browser pool (%v) — falling back to direct HTTP", err)
-		pool = nil
-	}
-	if pool != nil {
-		defer pool.Close()
-	}
-
-	profile, err := linkedinpkg.FetchProfile(profileURL, pool)
-	if err != nil {
-		log.Fatalf("Failed to fetch profile: %v", err)
+	// Try the Puppeteer service first (PUPPETEER_SERVICE_URL env var).
+	// This is the preferred path on Windows where spawned headless Chrome
+	// processes are blocked from making network requests by Windows Defender.
+	var profile *linkedinpkg.Profile
+	if svcURL := os.Getenv("PUPPETEER_SERVICE_URL"); svcURL != "" {
+		log.Printf("Using puppeteer service at %s", svcURL)
+		client := puppeteerpkg.NewClient(svcURL)
+		if err := client.Ping(); err != nil {
+			log.Fatalf("Puppeteer service unreachable: %v\nStart it with: cd puppeteer-service && npm start", err)
+		}
+		html, err := client.FetchLinkedIn(profileURL)
+		if err != nil {
+			log.Fatalf("Failed to fetch profile via puppeteer service: %v", err)
+		}
+		var parseErr error
+		profile, parseErr = linkedinpkg.ParseHTML(html, profileURL)
+		if parseErr != nil {
+			log.Fatalf("Failed to parse profile HTML: %v", parseErr)
+		}
+	} else {
+		// Fall back to in-process go-rod browser pool.
+		pool := browser.NewPool()
+		if err := pool.Init(); err != nil {
+			log.Printf("Warning: could not start browser pool (%v) — falling back to direct HTTP", err)
+			pool = nil
+		}
+		if pool != nil {
+			defer pool.Close()
+		}
+		var err error
+		profile, err = linkedinpkg.FetchProfile(profileURL, pool)
+		if err != nil {
+			log.Fatalf("Failed to fetch profile: %v", err)
+		}
 	}
 
 	if apiKey := os.Getenv("CLAUDE_API_KEY"); apiKey != "" {
