@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -63,6 +64,7 @@ type Pool struct {
 	proxyURL  string
 	proxyUser string
 	proxyPass string
+	remote    bool // true when connected to an existing Chrome (not launched by us)
 }
 
 // NewPool creates a Pool. Reads config from environment variables.
@@ -102,9 +104,24 @@ func NewPool() *Pool {
 	}
 }
 
-// Init launches all browsers. Must be called once before FetchHTML.
+// Init connects to or launches browsers.
+//
+// If CHROME_REMOTE_DEBUG_URL is set (e.g. http://localhost:9222), the pool
+// connects to that existing Chrome process instead of launching a new headless
+// one. This is useful on Windows where spawned headless Chrome processes are
+// sometimes blocked from making network requests by Windows Defender / Firewall.
+//
+// To enable: start Chrome with --remote-debugging-port=9222, then set
+// CHROME_REMOTE_DEBUG_URL=http://localhost:9222 in .env.
 func (p *Pool) Init() error {
-	log.Printf("[browser] initialising pool of %d browser(s)", p.size)
+	if remoteURL := os.Getenv("CHROME_REMOTE_DEBUG_URL"); remoteURL != "" {
+		return p.initRemote(remoteURL)
+	}
+	return p.initHeadless()
+}
+
+func (p *Pool) initHeadless() error {
+	log.Printf("[browser] initialising pool of %d headless browser(s)", p.size)
 	for i := 0; i < p.size; i++ {
 		b, err := p.launchBrowser()
 		if err != nil {
@@ -116,8 +133,30 @@ func (p *Pool) Init() error {
 	return nil
 }
 
-// Close shuts down all idle browsers in the pool.
+func (p *Pool) initRemote(debugURL string) error {
+	log.Printf("[browser] connecting to existing Chrome at %s", debugURL)
+	wsURL, err := launcher.ResolveURL(debugURL)
+	if err != nil {
+		return fmt.Errorf("cannot resolve Chrome debug URL %s: %w", debugURL, err)
+	}
+	b := rod.New().ControlURL(wsURL)
+	if err := b.Connect(); err != nil {
+		return fmt.Errorf("failed to connect to Chrome at %s: %w", debugURL, err)
+	}
+	log.Printf("[browser] connected to existing Chrome")
+	p.remote = true
+	// All pool slots share the same browser connection.
+	for i := 0; i < p.size; i++ {
+		p.ch <- b
+	}
+	return nil
+}
+
+// Close shuts down idle browsers. No-op for remote connections (we don't own the process).
 func (p *Pool) Close() {
+	if p.remote {
+		return
+	}
 	for {
 		select {
 		case b := <-p.ch:
@@ -136,6 +175,10 @@ func (p *Pool) acquire() *rod.Browser {
 // release returns a browser to the pool, replacing it if it has crashed.
 // Uses Version() as a lightweight liveness probe.
 func (p *Pool) release(b *rod.Browser) {
+	if p.remote {
+		p.ch <- b
+		return
+	}
 	if _, err := b.Version(); err != nil {
 		log.Println("[browser] browser disconnected — replacing")
 		b.Close() //nolint:errcheck
@@ -152,9 +195,10 @@ func (p *Pool) release(b *rod.Browser) {
 func (p *Pool) launchBrowser() (*rod.Browser, error) {
 	l := launcher.New().
 		Headless(true).
-		NoSandbox(true).
-		Set("disable-setuid-sandbox").
-		Set("disable-dev-shm-usage")
+		Leakless(false) // leakless.exe is blocked by Windows Defender on Windows
+	// Note: NoSandbox / disable-setuid-sandbox / disable-dev-shm-usage are
+	// Linux/CI flags. On Windows they are either no-ops or can interfere with
+	// Chrome's network stack — leave them out.
 
 	if p.proxyURL != "" {
 		l = l.Set("proxy-server", p.proxyURL)
@@ -164,10 +208,13 @@ func (p *Pool) launchBrowser() (*rod.Browser, error) {
 		l = l.Bin(exe)
 	}
 
+	log.Printf("[browser] launching Chrome (headless)")
+
 	wsURL, err := l.Launch()
 	if err != nil {
 		return nil, fmt.Errorf("failed to launch Chrome: %w", err)
 	}
+	log.Printf("[browser] Chrome DevTools URL: %s", wsURL)
 
 	b := rod.New().ControlURL(wsURL)
 	if err := b.Connect(); err != nil {
@@ -289,15 +336,15 @@ func (p *Pool) FetchHTML(targetURL string) (string, error) {
 // FetchLinkedInHTML — Google-referral approach for LinkedIn bot avoidance
 // ---------------------------------------------------------------------------
 
-// FetchLinkedInHTML fetches a LinkedIn profile page by first navigating to a
-// Google search for the profile, then clicking the LinkedIn result so Chrome
-// sends an authentic Referer header. Direct navigation to LinkedIn without a
-// referrer triggers the signup-wall redirect.
+// FetchLinkedInHTML replicates the manual flow: open a fresh browser, search
+// Google for the LinkedIn profile, click the result. Cookies are cleared first
+// to simulate an incognito session without using Chrome's incognito context
+// (which is unreliable with go-rod on Windows).
 func (p *Pool) FetchLinkedInHTML(profileURL string) (string, error) {
 	b := p.acquire()
 	defer p.release(b)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 
 	var stopAuth func() error
@@ -328,33 +375,101 @@ func (p *Pool) FetchLinkedInHTML(profileURL string) (string, error) {
 		return "", fmt.Errorf("failed to set user agent: %w", err)
 	}
 
-	// Step 1: visit Google homepage to plant a genuine Google session in Chrome
-	// (cookies, TLS session, HTTP/2 connection).
-	log.Println("[browser] step 1: visiting Google to seed session")
-	navigateWithStop(page, "https://www.google.com/", 30*time.Second)
-	logPageTitle(page, "Google")
+	// Clear all cookies for headless mode to simulate a fresh incognito session.
+	// Skipped for remote Chrome — clearing would wipe real browser sessions.
+	if !p.remote {
+		if err := (proto.NetworkClearBrowserCookies{}).Call(page); err != nil {
+			log.Printf("[browser] warning: could not clear cookies: %v", err)
+		} else {
+			log.Println("[browser] cookies cleared (fresh session)")
+		}
+	}
 
-	// Step 2: navigate to LinkedIn by evaluating window.location.href from
-	// within the Google page context. This lets Chrome set the navigation
-	// headers authentically:
-	//   Referer: https://www.google.com/
-	//   sec-fetch-site: cross-site
-	//   sec-fetch-mode: navigate
-	//   sec-fetch-dest: document
-	// SetExtraHeaders injection can't reproduce these — Chrome would still
-	// send sec-fetch-site: none, which LinkedIn detects as suspicious.
-	log.Printf("[browser] step 2: navigating to LinkedIn from Google context")
-	waitNav := page.Timeout(60 * time.Second).WaitNavigation(proto.PageLifecycleEventNameDOMContentLoaded)
-	page.Eval(fmt.Sprintf(`() => { window.location.href = %q }`, profileURL)) //nolint:errcheck
-	waitNav()
-	proto.PageStopLoading{}.Call(page) //nolint:errcheck
+	// Connectivity test: navigate to a data URL (no network needed).
+	// If this fails, Chrome's CDP connection is broken. If it succeeds but
+	// http://example.com fails, there is a network/proxy/firewall block.
+	log.Println("[browser] connectivity test 1: data URL (no network)")
+	if err := page.Timeout(5 * time.Second).Navigate("data:text/html,<h1>ok</h1>"); err != nil {
+		log.Printf("[browser] FATAL: even data URL navigation failed — CDP broken: %v", err)
+	} else {
+		log.Println("[browser] connectivity test 1 passed")
+	}
+
+	log.Println("[browser] connectivity test 2: http://example.com")
+	navigateWithStop(page, "http://example.com/", 15*time.Second)
+	if info, err := page.Info(); err != nil {
+		log.Printf("[browser] connectivity test 2 page.Info error: %v", err)
+	} else {
+		log.Printf("[browser] connectivity test 2 URL: %s", info.URL)
+	}
+	logPageTitle(page, "example.com")
+
+	// Step 1: navigate to a Google search for the LinkedIn profile.
+	profileID := linkedInID(profileURL)
+	searchURL := "https://www.google.com/search?q=" +
+		url.QueryEscape("linkedin "+profileID) + "&hl=en"
+	log.Printf("[browser] step 1: navigating to Google search — %s", searchURL)
+
+	navigateWithStop(page, searchURL, 60*time.Second)
+
+	if info, err := page.Info(); err != nil {
+		log.Printf("[browser] page.Info error after Google nav: %v", err)
+	} else {
+		log.Printf("[browser] URL after Google nav: %s", info.URL)
+	}
+	logPageTitle(page, "Google search")
+
+	// Log a snippet of the page body to confirm we actually got search results.
+	if r, err := page.Timeout(5 * time.Second).Eval(`() => document.body ? document.body.innerText.slice(0, 300) : "(no body)"`); err != nil {
+		log.Printf("[browser] body preview error: %v", err)
+	} else {
+		log.Printf("[browser] body preview: %s", r.Value.String())
+	}
+
+	time.Sleep(2 * time.Second)
+
+	// Step 2: find and click the LinkedIn result so Chrome generates an authentic
+	// link-click navigation (Referer + sec-fetch-site: cross-site).
+	log.Println("[browser] step 2: looking for LinkedIn result to click")
+	clicked := false
+	for _, sel := range []string{
+		fmt.Sprintf(`a[href*="linkedin.com/in/%s"]`, profileID),
+		`a[href*="linkedin.com/in/"]`,
+	} {
+		el, elErr := page.Timeout(8 * time.Second).Element(sel)
+		if elErr != nil {
+			log.Printf("[browser] selector %q not found: %v", sel, elErr)
+			continue
+		}
+		href, _ := el.Attribute("href")
+		log.Printf("[browser] found LinkedIn link: %v — clicking", href)
+		waitNav := page.Timeout(60 * time.Second).WaitNavigation(proto.PageLifecycleEventNameDOMContentLoaded)
+		if clickErr := el.Click(proto.InputMouseButtonLeft, 1); clickErr != nil {
+			log.Printf("[browser] click error: %v", clickErr)
+			continue
+		}
+		waitNav()
+		proto.PageStopLoading{}.Call(page) //nolint:errcheck
+		clicked = true
+		break
+	}
+
+	if !clicked {
+		log.Println("[browser] no LinkedIn link found in SERP — JS redirect from Google context")
+		waitNav := page.Timeout(60 * time.Second).WaitNavigation(proto.PageLifecycleEventNameDOMContentLoaded)
+		page.Eval(fmt.Sprintf(`() => { window.location.href = %q }`, profileURL)) //nolint:errcheck
+		waitNav()
+		proto.PageStopLoading{}.Call(page) //nolint:errcheck
+	}
+
 	time.Sleep(500 * time.Millisecond)
 
-	// Diagnostics.
-	logPageTitle(page, "LinkedIn")
-	if info, err := page.Info(); err == nil {
-		log.Printf("[browser] current URL: %s", info.URL)
+	if info, err := page.Info(); err != nil {
+		log.Printf("[browser] page.Info error after LinkedIn nav: %v", err)
+	} else {
+		log.Printf("[browser] URL after LinkedIn nav: %s", info.URL)
 	}
+	logPageTitle(page, "LinkedIn")
 
 	log.Println("[browser] checking for Cloudflare challenge...")
 	if err := waitForChallengeResolution(page); err != nil {
@@ -369,7 +484,7 @@ func (p *Pool) FetchLinkedInHTML(profileURL string) (string, error) {
 		return "", fmt.Errorf("failed to get page HTML: %w", err)
 	}
 	html := result.Value.String()
-	log.Printf("[browser] got %d bytes", len(html))
+	log.Printf("[browser] got %d bytes of HTML", len(html))
 	return html, nil
 }
 
