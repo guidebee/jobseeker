@@ -255,6 +255,11 @@ jobseeker/
 │   ├── archive/           # Processed JDs moved here
 │   └── README.md
 ├── coverletters/           # Generated cover letters (NEW)
+├── puppeteer-service/      # Stealth browser proxy (LinkedIn profile fetching)
+│   ├── index.ts           # Express-style HTTP server + browser pool
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── .env               # Proxy credentials & service settings
 ├── .env                    # API keys & settings
 └── jobseeker.db            # SQLite database
 ```
@@ -608,6 +613,83 @@ jobseeker linkedin guidebee
 jobseeker linkedin john-doe-123456
 jobseeker linkedin https://www.linkedin.com/in/guidebee/
 ```
+
+#### Puppeteer Service (recommended on Windows)
+
+LinkedIn aggressively blocks headless Chrome. On Windows, the built-in browser pool is additionally blocked by Windows Defender from making outbound network requests. The recommended approach is to run the separate Puppeteer stealth service, which uses a residential proxy to bypass bot detection.
+
+**1. Start the service** (in a separate terminal):
+```bash
+cd puppeteer-service
+npm install        # first time only
+npm start
+```
+
+Expected startup output:
+```
+[relay] local proxy relay on 127.0.0.1:56328 → gw.dataimpulse.com:823
+[pool] proxy via relay 127.0.0.1:56328 → gw.dataimpulse.com:823  auth=yes
+[pool] 2 browser(s) ready
+[proxy-test] OK — outbound IP: {"ip":"46.189.165.127"}
+[puppeteer-service] listening on :3001  proxy=true
+```
+
+**2. Point the CLI at the service** via `.env`:
+```bash
+PUPPETEER_SERVICE_URL=http://localhost:3001
+```
+
+**3. Run as normal:**
+```bash
+jobseeker linkedin guidebee
+```
+
+When `PUPPETEER_SERVICE_URL` is set the CLI uses the service automatically. If the service is unreachable it prints an error and tells you to start it.
+
+#### Puppeteer Service Configuration (`puppeteer-service/.env`)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `SOLSCAN_PROXY_HOST` | — | Residential proxy host (e.g. `gw.dataimpulse.com`) |
+| `SOLSCAN_PROXY_PORT` | `823` | Proxy port |
+| `SOLSCAN_PROXY_USER` | — | Proxy username (leave blank if using IP whitelist auth) |
+| `SOLSCAN_PROXY_PASS` | — | Proxy password |
+| `SKIP_GOOGLE_SEARCH` | `false` | `true` = navigate directly to LinkedIn; `false` = search Google first then click the result (more realistic Referer header but blocked if Google shows a CAPTCHA) |
+| `PUPPETEER_SERVICE_PORT` | `3001` | HTTP port the service listens on |
+| `PUPPETEER_POOL_SIZE` | `2` | Number of browser instances to keep warm |
+| `PUPPETEER_EXECUTABLE_PATH` | — | Path to a custom Chrome/Chromium binary |
+
+**Proxy notes:**
+- The service supports two DataImpulse auth modes:
+  - **IP whitelist** (no credentials needed): leave `SOLSCAN_PROXY_USER` / `SOLSCAN_PROXY_PASS` blank. All connections from your whitelisted IP are accepted automatically.
+  - **Username + password**: set both vars. The service starts a local relay proxy that injects `Proxy-Authorization` into every HTTPS CONNECT tunnel (required because `page.authenticate()` is broken for CONNECT tunnels in Puppeteer v22).
+- If the proxy IP resolves to a non-English region, the service auto-retries up to 3 times until it gets an English-language page.
+- To force a specific country with DataImpulse, append a routing suffix to the username: `username-country-US` or `username-country-AU`.
+
+#### How it works
+
+```
+jobseeker CLI  →  POST /fetch-linkedin  →  Puppeteer service
+                                               │
+                                        stealth Chrome + residential proxy
+                                               │
+                                        LinkedIn public profile
+                                               │
+                                        returns raw HTML
+                                               │
+jobseeker CLI  ←  HTML  ←──────────────────────┘
+    │
+    ├─ ParseHTML() extracts name, experience, certs, projects, skills
+    └─ Claude AI infers hidden skills section (optional, needs CLAUDE_API_KEY)
+```
+
+The service exposes three endpoints:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/health` | GET | Health check — used by the CLI before each request |
+| `/fetch-linkedin` | POST `{"url":"..."}` | LinkedIn profile fetch with stealth + proxy + retry |
+| `/fetch` | POST `{"url":"...","response_type":"html"}` | Generic page fetch for other use cases |
 
 **Sample output:**
 ```
@@ -1908,6 +1990,7 @@ jobseeker export --all-statuses --output my_jobs.xlsx  # Export all jobs
 | `DB_PATH` | No | `./jobseeker.db` | Database location |
 | `SCRAPER_DELAY_MS` | No | `2000` | Delay between requests |
 | `MATCH_THRESHOLD` | No | `70` | Minimum score for recommendations |
+| `PUPPETEER_SERVICE_URL` | No | — | URL of puppeteer service for LinkedIn fetching (e.g. `http://localhost:3001`) |
 
 ## Automated Pipeline (Cron Job)
 
