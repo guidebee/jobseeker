@@ -404,6 +404,9 @@ func (p *Pool) FetchLinkedInHTML(profileURL string) (string, error) {
 	}
 	logPageTitle(page, "example.com")
 
+	// Pre-set Google consent cookie so the AU/EU consent page never appears.
+	setGoogleConsentCookie(page)
+
 	// Step 1: navigate to a Google search for the LinkedIn profile.
 	profileID := linkedInID(profileURL)
 	searchURL := "https://www.google.com/search?q=" +
@@ -486,6 +489,156 @@ func (p *Pool) FetchLinkedInHTML(profileURL string) (string, error) {
 	html := result.Value.String()
 	log.Printf("[browser] got %d bytes of HTML", len(html))
 	return html, nil
+}
+
+// SearchAndFetchLinkedIn does a Google keyword search (site:linkedin.com/in KEYWORDS),
+// finds the first matching LinkedIn profile URL in the SERP, clicks it to generate
+// an authentic Referer, and returns the profile URL and rendered HTML.
+func (p *Pool) SearchAndFetchLinkedIn(keywords string) (profileURL, html string, err error) {
+	b := p.acquire()
+	defer p.release(b)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	defer cancel()
+
+	var stopAuth func() error
+	if p.proxyUser != "" {
+		stopAuth = b.HandleAuth(p.proxyUser, p.proxyPass)
+	}
+	defer func() {
+		if stopAuth != nil {
+			stopAuth() //nolint:errcheck
+		}
+	}()
+
+	page, err := stealth.Page(b)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create stealth page: %w", err)
+	}
+	defer page.Close()
+	page = page.Context(ctx)
+
+	vp := viewports[rand.Intn(len(viewports))]
+	if err := page.SetViewport(&proto.EmulationSetDeviceMetricsOverride{
+		Width: vp.w, Height: vp.h, DeviceScaleFactor: 1,
+	}); err != nil {
+		return "", "", fmt.Errorf("failed to set viewport: %w", err)
+	}
+	ua := userAgents[rand.Intn(len(userAgents))]
+	if err := page.SetUserAgent(&proto.NetworkSetUserAgentOverride{UserAgent: ua}); err != nil {
+		return "", "", fmt.Errorf("failed to set user agent: %w", err)
+	}
+
+	if !p.remote {
+		if err := (proto.NetworkClearBrowserCookies{}).Call(page); err != nil {
+			log.Printf("[browser] warning: could not clear cookies: %v", err)
+		} else {
+			log.Println("[browser] cookies cleared (fresh session)")
+		}
+	}
+
+	// Step 1: Bing keyword search. No site: operator — both Google and Bing
+	// CAPTCHA headless browsers on operator queries. Appending "linkedin" steers
+	// results toward profile pages without triggering operator-based bot detection.
+	query := keywords + " linkedin"
+	searchURL := "https://www.bing.com/search?q=" + url.QueryEscape(query) + "&setlang=en"
+	log.Printf("[browser] step 1: LinkedIn keyword search (Bing) — %s", searchURL)
+
+	navigateWithStop(page, searchURL, 60*time.Second)
+	time.Sleep(2 * time.Second)
+	logPageTitle(page, "Google search")
+
+	if r, err := page.Timeout(5 * time.Second).Eval(`() => document.body ? document.body.innerText.slice(0, 300) : "(no body)"`); err != nil {
+		log.Printf("[browser] body preview error: %v", err)
+	} else {
+		log.Printf("[browser] body preview: %s", r.Value.String())
+	}
+
+	// Step 2: extract the first LinkedIn profile URL from Bing SERP.
+	// Bing result links use opaque redirect hrefs (bing.com/ck/a?...) — the actual
+	// URL is only in <cite> text like "au.linkedin.com › in › guidebee".
+	r, evalErr := page.Timeout(10 * time.Second).Eval(`() => {
+		const cites = Array.from(document.querySelectorAll('cite'));
+		for (const cite of cites) {
+			const text = (cite.textContent || '').replace(/\s*[›>]\s*/g, '/').trim();
+			const m = text.match(/(?:https?:\/\/)?(?:[a-z]+\.)?linkedin\.com\/in\/([^/?#&\s]+)/i);
+			if (m && m[1]) return 'https://www.linkedin.com/in/' + m[1] + '/';
+		}
+		const links = Array.from(document.querySelectorAll('a[href]'));
+		for (const a of links) {
+			const href = a.href || '';
+			const m = href.match(/linkedin\.com\/in\/([^/?#&]+)/);
+			if (m && m[1]) return 'https://www.linkedin.com/in/' + m[1] + '/';
+		}
+		return '';
+	}`)
+	if evalErr != nil {
+		return "", "", fmt.Errorf("failed to extract LinkedIn URL from SERP: %w", evalErr)
+	}
+	foundURL := r.Value.String()
+	if foundURL == "" {
+		return "", "", fmt.Errorf("no LinkedIn profile found for keywords: %q", keywords)
+	}
+	log.Printf("[browser] step 2: found profile URL: %s", foundURL)
+
+	// Step 3: click the first Bing result title link — it redirects through Bing
+	// to LinkedIn, so LinkedIn sees Referer: https://www.bing.com/ (trusted).
+	clicked := false
+	for _, sel := range []string{
+		`li.b_algo h2 a`,
+		`a[href*="linkedin.com/in/"]`,
+	} {
+		el, elErr := page.Timeout(8 * time.Second).Element(sel)
+		if elErr != nil {
+			log.Printf("[browser] selector %q not found: %v", sel, elErr)
+			continue
+		}
+		href, _ := el.Attribute("href")
+		log.Printf("[browser] step 3: clicking LinkedIn link: %v", derefStr(href))
+		waitNav := page.Timeout(60 * time.Second).WaitNavigation(proto.PageLifecycleEventNameDOMContentLoaded)
+		if clickErr := el.Click(proto.InputMouseButtonLeft, 1); clickErr != nil {
+			log.Printf("[browser] click error: %v", clickErr)
+			continue
+		}
+		waitNav()
+		proto.PageStopLoading{}.Call(page) //nolint:errcheck
+		clicked = true
+		break
+	}
+
+	if !clicked {
+		log.Printf("[browser] no link to click — JS redirect to %s", foundURL)
+		waitNav := page.Timeout(60 * time.Second).WaitNavigation(proto.PageLifecycleEventNameDOMContentLoaded)
+		page.Eval(fmt.Sprintf(`() => { window.location.href = %q }`, foundURL)) //nolint:errcheck
+		waitNav()
+		proto.PageStopLoading{}.Call(page) //nolint:errcheck
+	}
+
+	time.Sleep(500 * time.Millisecond)
+
+	if info, infoErr := page.Info(); infoErr == nil {
+		log.Printf("[browser] URL after LinkedIn nav: %s", info.URL)
+		profileURL = info.URL
+	} else {
+		profileURL = foundURL
+	}
+	logPageTitle(page, "LinkedIn")
+
+	log.Println("[browser] checking for Cloudflare challenge...")
+	if err := waitForChallengeResolution(page); err != nil {
+		return "", "", err
+	}
+
+	time.Sleep(3 * time.Second)
+
+	log.Println("[browser] reading page HTML...")
+	result, err := page.Timeout(40 * time.Second).Eval(`() => document.documentElement.outerHTML`)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get page HTML: %w", err)
+	}
+	htmlContent := result.Value.String()
+	log.Printf("[browser] got %d bytes of HTML", len(htmlContent))
+	return profileURL, htmlContent, nil
 }
 
 // navigateWithStop navigates to url, tolerating timeouts by issuing a CDP
@@ -588,4 +741,21 @@ func waitForChallengeResolution(page *rod.Page) error {
 	}
 
 	return fmt.Errorf("Cloudflare challenge did not resolve within %s", total)
+}
+
+// setGoogleConsentCookie pre-sets Google's SOCS consent cookie via CDP so the
+// AU/EU consent page never appears. Must be called before any google.com navigation.
+// CDP Network.setCookie works for any domain without requiring prior navigation.
+func setGoogleConsentCookie(page *rod.Page) {
+	_, err := proto.NetworkSetCookie{
+		Name:   "SOCS",
+		Value:  "CAI",
+		Domain: ".google.com",
+		Path:   "/",
+	}.Call(page)
+	if err != nil {
+		log.Printf("[browser] warning: could not set Google consent cookie: %v", err)
+	} else {
+		log.Println("[browser] Google consent cookie set (SOCS=CAI)")
+	}
 }
