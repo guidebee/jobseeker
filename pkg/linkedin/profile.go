@@ -89,6 +89,22 @@ var (
 	showMoreRe = regexp.MustCompile(`(?i)\s*(show\s+more|show\s+less)\s*`)
 )
 
+// ErrNonEnglishPage is returned when the fetched page appears to be a
+// non-English error page (e.g. LinkedIn's Arabic "page not found").
+// Callers may retry on this error.
+var ErrNonEnglishPage = fmt.Errorf("LinkedIn returned a non-English page (likely an error or redirect) — retry may help")
+
+// isNonLatinText returns true when s contains no ASCII letters or digits,
+// which indicates the text is from a non-English error page.
+func isNonLatinText(s string) bool {
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			return false
+		}
+	}
+	return len(strings.TrimSpace(s)) > 0
+}
+
 // ParseHTML parses a LinkedIn profile from already-fetched HTML.
 // Use this when HTML is obtained externally (e.g. via the Puppeteer service).
 func ParseHTML(html, profileURL string) (*Profile, error) {
@@ -101,6 +117,9 @@ func ParseHTML(html, profileURL string) (*Profile, error) {
 	}
 	if profile.Name == "" {
 		return nil, fmt.Errorf("could not extract profile data from HTML (LinkedIn may have blocked the request or returned a login wall)")
+	}
+	if isNonLatinText(profile.Name) {
+		return nil, fmt.Errorf("%w (got name: %q)", ErrNonEnglishPage, profile.Name)
 	}
 	return profile, nil
 }
@@ -135,6 +154,9 @@ func FetchProfile(profileURL string, pool *browser.Pool) (*Profile, error) {
 
 	if profile.Name == "" {
 		return nil, fmt.Errorf("could not extract profile data from %s (LinkedIn may have blocked the request)", profileURL)
+	}
+	if isNonLatinText(profile.Name) {
+		return nil, fmt.Errorf("%w (got name: %q)", ErrNonEnglishPage, profile.Name)
 	}
 
 	return profile, nil
