@@ -650,10 +650,10 @@ When `PUPPETEER_SERVICE_URL` is set the CLI uses the service automatically. If t
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `SOLSCAN_PROXY_HOST` | — | Residential proxy host (e.g. `gw.dataimpulse.com`) |
-| `SOLSCAN_PROXY_PORT` | `823` | Proxy port |
-| `SOLSCAN_PROXY_USER` | — | Proxy username (leave blank if using IP whitelist auth) |
-| `SOLSCAN_PROXY_PASS` | — | Proxy password |
+| `SCAN_PROXY_HOST` | — | Residential proxy host (e.g. `gw.dataimpulse.com`) |
+| `SCAN_PROXY_PORT` | `823` | Proxy port |
+| `SCAN_PROXY_USER` | — | Proxy username (leave blank if using IP whitelist auth) |
+| `SCAN_PROXY_PASS` | — | Proxy password |
 | `SKIP_GOOGLE_SEARCH` | `false` | `true` = navigate directly to LinkedIn; `false` = search Google first then click the result (more realistic Referer header but blocked if Google shows a CAPTCHA) |
 | `PUPPETEER_SERVICE_PORT` | `3001` | HTTP port the service listens on |
 | `PUPPETEER_POOL_SIZE` | `2` | Number of browser instances to keep warm |
@@ -661,7 +661,7 @@ When `PUPPETEER_SERVICE_URL` is set the CLI uses the service automatically. If t
 
 **Proxy notes:**
 - The service supports two DataImpulse auth modes:
-  - **IP whitelist** (no credentials needed): leave `SOLSCAN_PROXY_USER` / `SOLSCAN_PROXY_PASS` blank. All connections from your whitelisted IP are accepted automatically.
+  - **IP whitelist** (no credentials needed): leave `SCAN_PROXY_USER` / `SCAN_PROXY_PASS` blank. All connections from your whitelisted IP are accepted automatically.
   - **Username + password**: set both vars. The service starts a local relay proxy that injects `Proxy-Authorization` into every HTTPS CONNECT tunnel (required because `page.authenticate()` is broken for CONNECT tunnels in Puppeteer v22).
 - If the proxy IP resolves to a non-English region, the service auto-retries up to 3 times until it gets an English-language page.
 - To force a specific country with DataImpulse, append a routing suffix to the username: `username-country-US` or `username-country-AU`.
