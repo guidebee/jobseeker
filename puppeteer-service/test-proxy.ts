@@ -5,13 +5,13 @@
 import "dotenv/config";
 import net from "net";
 
-const host = process.env.SOLSCAN_PROXY_HOST!;
-const port = Number(process.env.SOLSCAN_PROXY_PORT ?? 823);
-const user = process.env.SOLSCAN_PROXY_USER!;
-const pass = process.env.SOLSCAN_PROXY_PASS!;
+const host = process.env.SCAN_PROXY_HOST!;
+const port = Number(process.env.SCAN_PROXY_PORT ?? 823);
+const user = process.env.SCAN_PROXY_USER!;
+const pass = process.env.SCAN_PROXY_PASS!;
 
 if (!host || !user || !pass) {
-  console.error("Missing SOLSCAN_PROXY_HOST / SOLSCAN_PROXY_USER / SOLSCAN_PROXY_PASS in .env");
+  console.error("Missing SCAN_PROXY_HOST / SCAN_PROXY_USER / SCAN_PROXY_PASS in .env");
   process.exit(1);
 }
 

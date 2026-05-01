@@ -7,10 +7,10 @@
 //
 //	BROWSER_POOL_SIZE          number of persistent browsers (default 2)
 //	PUPPETEER_EXECUTABLE_PATH  path to Chrome/Chromium binary
-//	SOLSCAN_PROXY_HOST         proxy host (when residential proxy is needed)
-//	SOLSCAN_PROXY_PORT         proxy port (default 823)
-//	SOLSCAN_PROXY_USER         proxy username
-//	SOLSCAN_PROXY_PASS         proxy password
+//	SCAN_PROXY_HOST         proxy host (when residential proxy is needed)
+//	SCAN_PROXY_PORT         proxy port (default 823)
+//	SCAN_PROXY_USER         proxy username
+//	SCAN_PROXY_PASS         proxy password
 package browser
 
 import (
@@ -76,10 +76,10 @@ func NewPool() *Pool {
 		}
 	}
 
-	host := os.Getenv("SOLSCAN_PROXY_HOST")
-	port := os.Getenv("SOLSCAN_PROXY_PORT")
-	user := os.Getenv("SOLSCAN_PROXY_USER")
-	pass := os.Getenv("SOLSCAN_PROXY_PASS")
+	host := os.Getenv("SCAN_PROXY_HOST")
+	port := os.Getenv("SCAN_PROXY_PORT")
+	user := os.Getenv("SCAN_PROXY_USER")
+	pass := os.Getenv("SCAN_PROXY_PASS")
 	if port == "" {
 		port = "823"
 	}

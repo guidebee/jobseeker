@@ -15,10 +15,10 @@ const PORT = Number(process.env.PUPPETEER_SERVICE_PORT ?? 3001);
 const POOL_SIZE = Number(process.env.PUPPETEER_POOL_SIZE ?? 2);
 const CHROME_EXECUTABLE = process.env.PUPPETEER_EXECUTABLE_PATH;
 
-const PROXY_HOST = process.env.SOLSCAN_PROXY_HOST ?? "";
-const PROXY_PORT_NUM = Number(process.env.SOLSCAN_PROXY_PORT ?? 823);
-const PROXY_USER = process.env.SOLSCAN_PROXY_USER ?? "";
-const PROXY_PASS = process.env.SOLSCAN_PROXY_PASS ?? "";
+const PROXY_HOST = process.env.SCAN_PROXY_HOST ?? "";
+const PROXY_PORT_NUM = Number(process.env.SCAN_PROXY_PORT ?? 823);
+const PROXY_USER = process.env.SCAN_PROXY_USER ?? "";
+const PROXY_PASS = process.env.SCAN_PROXY_PASS ?? "";
 const PROXY_ENABLED = PROXY_HOST !== "";
 
 // When true, skip the Google-search step and navigate to LinkedIn directly.
