@@ -749,6 +749,92 @@ Entity Framework, .NET, C#
 
 ---
 
+### `jobseeker findlinkedin` - Find a LinkedIn Profile by Keywords
+
+Searches Bing for the first LinkedIn profile matching the given keywords, then fetches and displays it. Use this when you only know someone's name, employer, or location — not their LinkedIn profile ID.
+
+**Usage:**
+```bash
+jobseeker findlinkedin <keywords...>
+```
+
+All positional arguments are joined into a single search query. Quoted phrases are kept together by the shell.
+
+**Examples:**
+```bash
+# Name + employer
+jobseeker findlinkedin James Shen "Victorian Electoral Commission"
+
+# Name + location
+jobseeker findlinkedin James Shen Australia
+
+# Name + role + location
+jobseeker findlinkedin John Smith "Senior Engineer" Google Sydney
+```
+
+**How it works:**
+
+```
+jobseeker CLI
+    │
+    ├─ Phase 1 — Bing search: "James Shen Victorian Electoral Commission linkedin"
+    │       Bing SERP HTML → read <cite> display URLs → extract first linkedin.com/in/ URL
+    │       Click Bing result title → navigate to LinkedIn (Referer: bing.com)
+    │       Return profile HTML + resolved profile URL
+    │
+    └─ Phase 2 — Parse profile
+            ParseHTML() → if non-English page, re-fetch via FetchLinkedIn() and retry
+            Up to 5 retries for both search and parse phases
+```
+
+**Why Bing instead of Google?**
+
+Google blocks headless browsers on `site:linkedin.com/in` searches with a CAPTCHA. Bing has much weaker bot detection and serves results reliably for natural-language queries. The search query appends `linkedin` as a plain keyword (e.g. `James Shen Australia Victorian Electoral Commission linkedin`) to steer results toward LinkedIn profiles without using operators that trigger bot detection.
+
+**Requires the Puppeteer service** (same setup as `linkedin` — see above). Set `PUPPETEER_SERVICE_URL=http://localhost:3001` in `.env` and start the service:
+
+```bash
+cd puppeteer-service
+npm start
+```
+
+**Retry behaviour:**
+- **Search phase**: up to 5 attempts on network/timeout errors
+- **Parse phase**: up to 5 attempts on non-English pages — re-fetches the profile each time (a fresh session may land on an English-region IP)
+
+**Sample output:**
+```
+$ jobseeker findlinkedin James Shen "Victorian Electoral Commission"
+
+Searching for LinkedIn profile: "James Shen Victorian Electoral Commission"
+
+Found profile: https://www.linkedin.com/in/guidebee/
+
+Inferring skills via Claude AI...
+
+=== LinkedIn Profile (used as CV) ===
+
+NAME: James Shen
+LINKEDIN: https://www.linkedin.com/in/guidebee/
+
+EXPERIENCE:
+- Victorian Electoral Commission
+  ...
+
+SKILLS:
+Go, React, AWS, Kubernetes, Docker, ...
+```
+
+**Difference from `linkedin` command:**
+
+| | `linkedin` | `findlinkedin` |
+|---|---|---|
+| Input | Known profile ID or URL | Free-text keywords (name, employer, location) |
+| Search | No search needed | Bing search to discover the URL |
+| Use case | You have the LinkedIn URL | You only know who the person is |
+
+---
+
 ### `jobseeker checkjd` - Analyze Recruiter Job Descriptions
 
 Analyzes job descriptions received directly from recruiters (typically via email as Word documents) and generates tailored cover letters with iterative refinement.
@@ -1925,7 +2011,8 @@ Error: failed to get MiniMax response
 | Command | Purpose | Key Flags |
 |---------|---------|-----------|
 | `jobseeker init` | Initialize profile and cache resumes | `--force`, `--github`, `--linkedin` |
-| `jobseeker linkedin` | Fetch LinkedIn profile + infer skills via Claude | `<user-id or URL>` |
+| `jobseeker linkedin` | Fetch LinkedIn profile by ID or URL + infer skills | `<user-id or URL>` |
+| `jobseeker findlinkedin` | Search Bing for a LinkedIn profile by keywords | `<keywords...>` |
 | `jobseeker scan` | Discover jobs from configured URLs | `--config`, `--database` |
 | `jobseeker analyze` | AI job matching with MiniMax | `--contract`, `--type` |
 | `jobseeker list` | View jobs from database | `--recommended`, `--contract`, `--type`, `--limit` |
@@ -1941,6 +2028,10 @@ jobseeker scan && jobseeker analyze && jobseeker list --recommended
 
 # Contract-focused search
 jobseeker scan && jobseeker analyze --contract && jobseeker list --contract --recommended
+
+# Find a LinkedIn profile by keywords (when you don't have the profile ID)
+jobseeker findlinkedin James Shen "Victorian Electoral Commission"
+jobseeker findlinkedin John Smith Google Engineer Sydney
 
 # Quick status check
 jobseeker list --recommended --limit 5
