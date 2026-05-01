@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/guidebee/jobseeker/pkg/browser"
 	claudepkg "github.com/guidebee/jobseeker/pkg/claude"
@@ -49,14 +51,28 @@ func runLinkedIn(cmd *cobra.Command, args []string) {
 		if err := client.Ping(); err != nil {
 			log.Fatalf("Puppeteer service unreachable: %v\nStart it with: cd puppeteer-service && npm start", err)
 		}
-		html, err := client.FetchLinkedIn(profileURL)
-		if err != nil {
-			log.Fatalf("Failed to fetch profile via puppeteer service: %v", err)
-		}
-		var parseErr error
-		profile, parseErr = linkedinpkg.ParseHTML(html, profileURL)
-		if parseErr != nil {
-			log.Fatalf("Failed to parse profile HTML: %v", parseErr)
+		const maxRetries = 5
+		for attempt := 1; attempt <= maxRetries; attempt++ {
+			html, err := client.FetchLinkedIn(profileURL)
+			if err != nil {
+				if attempt < maxRetries {
+					log.Printf("Attempt %d failed: %v — retrying in 5s...", attempt, err)
+					time.Sleep(5 * time.Second)
+					continue
+				}
+				log.Fatalf("Failed to fetch profile via puppeteer service: %v", err)
+			}
+			var parseErr error
+			profile, parseErr = linkedinpkg.ParseHTML(html, profileURL)
+			if parseErr != nil {
+				if errors.Is(parseErr, linkedinpkg.ErrNonEnglishPage) && attempt < maxRetries {
+					log.Printf("Attempt %d: %v — retrying in 5s...", attempt, parseErr)
+					time.Sleep(5 * time.Second)
+					continue
+				}
+				log.Fatalf("Failed to parse profile HTML: %v", parseErr)
+			}
+			break
 		}
 	} else {
 		// Fall back to in-process go-rod browser pool.
