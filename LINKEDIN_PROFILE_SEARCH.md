@@ -242,14 +242,22 @@ The service is pre-configured for [DataImpulse](https://dataimpulse.com) residen
 
 | Mode | Setup |
 |------|-------|
-| IP whitelist | Leave `SOLSCAN_PROXY_USER` and `SOLSCAN_PROXY_PASS` blank. All connections from your whitelisted IP are accepted automatically. |
+| **IP whitelist** ✅ Recommended | Leave `SOLSCAN_PROXY_USER` and `SOLSCAN_PROXY_PASS` blank. All connections from your whitelisted IP are accepted automatically. |
 | Username + password | Set both vars. The service starts a local relay that injects `Proxy-Authorization` into every HTTPS CONNECT tunnel. |
 
-**Force a specific country** by appending a routing suffix to the username:
+> **Note: prefer IP whitelist mode over username/password with DataImpulse.**
+>
+> The username/password mode routes traffic through a local HTTPS CONNECT tunnel relay. This relay can cause intermittent connection failures — the tunnel handshake sometimes stalls or drops mid-session, leading to Chrome network errors that are hard to diagnose. IP whitelist mode bypasses the relay entirely: Chrome connects directly to the DataImpulse gateway without any credential negotiation, which is simpler and more stable. If you find profile fetches randomly failing with proxy or network errors, switching to IP whitelist mode is the first thing to try.
+>
+> To enable IP whitelist mode: log in to your DataImpulse dashboard, whitelist your current public IP, then leave `SOLSCAN_PROXY_USER` and `SOLSCAN_PROXY_PASS` unset (or remove them) in `puppeteer-service/.env`.
+
+**Force a specific country** (username/password mode only) by appending a routing suffix to the username:
 ```
 SOLSCAN_PROXY_USER=myuser-country-AU   # Australian exit IP
 SOLSCAN_PROXY_USER=myuser-country-US   # US exit IP
 ```
+
+In IP whitelist mode, country routing is configured in the DataImpulse dashboard instead.
 
 ### Without a proxy
 
@@ -267,8 +275,8 @@ Set these in `puppeteer-service/.env`:
 |----------|---------|---------|
 | `SOLSCAN_PROXY_HOST` | — | Residential proxy host |
 | `SOLSCAN_PROXY_PORT` | `823` | Proxy port |
-| `SOLSCAN_PROXY_USER` | — | Proxy username (blank = IP whitelist auth) |
-| `SOLSCAN_PROXY_PASS` | — | Proxy password |
+| `SOLSCAN_PROXY_USER` | — | Proxy username — leave blank for IP whitelist mode (recommended) |
+| `SOLSCAN_PROXY_PASS` | — | Proxy password — leave blank for IP whitelist mode (recommended) |
 | `SKIP_GOOGLE_SEARCH` | `false` | `true` = navigate to LinkedIn directly; `false` = go via Google SERP click |
 | `PUPPETEER_SERVICE_PORT` | `3001` | HTTP port the service listens on |
 | `PUPPETEER_POOL_SIZE` | `2` | Number of persistent browser instances |
