@@ -129,6 +129,48 @@ func (c *Client) FetchLinkedIn(profileURL string) (string, error) {
 	return result.HTML, nil
 }
 
+type searchLinkedInResponse struct {
+	HTML       string `json:"html"`
+	ProfileURL string `json:"profileURL"`
+	Error      string `json:"error"`
+}
+
+// SearchLinkedIn does a Google keyword search (site:linkedin.com/in KEYWORDS),
+// finds the first matching LinkedIn profile, and returns its URL and HTML.
+func (c *Client) SearchLinkedIn(keywords string) (profileURL, html string, err error) {
+	reqBody := struct {
+		Keywords string `json:"keywords"`
+	}{Keywords: keywords}
+
+	data, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	resp, err := c.http.Post(c.baseURL+"/search-linkedin", "application/json", bytes.NewReader(data))
+	if err != nil {
+		return "", "", fmt.Errorf("puppeteer service unreachable: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to read service response: %w", err)
+	}
+
+	var result searchLinkedInResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", "", fmt.Errorf("failed to parse service response: %w", err)
+	}
+	if result.Error != "" {
+		return "", "", fmt.Errorf("puppeteer service: %s", result.Error)
+	}
+	if result.HTML == "" {
+		return "", "", fmt.Errorf("puppeteer service returned empty HTML")
+	}
+	return result.ProfileURL, result.HTML, nil
+}
+
 // Ping checks the service health endpoint.
 func (c *Client) Ping() error {
 	resp, err := c.http.Get(c.baseURL + "/health")

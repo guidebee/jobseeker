@@ -247,6 +247,26 @@ function extractProfileId(profileURL: string): string {
   return m ? m[1]! : profileURL;
 }
 
+// setGoogleConsentCookie pre-sets Google's SOCS consent cookie so the consent
+// page never appears. Must be called before any google.com navigation.
+// CDP Network.setCookies works for any domain without prior navigation.
+async function setGoogleConsentCookie(page: Page): Promise<void> {
+  const cdp = await page.createCDPSession();
+  try {
+    await cdp.send("Network.setCookie", {
+      name: "SOCS",
+      value: "CAI",
+      domain: ".google.com",
+      path: "/",
+      secure: false,
+      httpOnly: false,
+    });
+    console.log("[google] consent cookie set (SOCS=CAI)");
+  } finally {
+    await cdp.detach();
+  }
+}
+
 // acceptGoogleConsent clicks "Accept all" on Google's cookie consent page if present.
 // Google shows this page on first visit in many regions (AU, EU, etc.).
 async function acceptGoogleConsent(page: Page): Promise<void> {
@@ -393,6 +413,9 @@ async function fetchLinkedInViaGoogle(profileURL: string): Promise<string> {
     await cdp.send("Network.clearBrowserCookies");
     await cdp.detach();
 
+    // Pre-set Google consent cookie so the GDPR/AU consent page never appears.
+    await setGoogleConsentCookie(page);
+
     // Step 1: navigate to Google search (domcontentloaded is enough to get links).
     console.log(`[linkedin] step 1: Google search — ${searchURL}`);
     try {
@@ -472,6 +495,126 @@ async function fetchLinkedInViaGoogle(profileURL: string): Promise<string> {
     const html = await page.content();
     console.log(`[linkedin] got ${html.length} bytes`);
     return html;
+
+  } finally {
+    if (page) await page.close().catch(() => {});
+    await pool.release(browser);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// LinkedIn keyword search  (Google site:linkedin.com/in + keywords → HTML)
+// ---------------------------------------------------------------------------
+
+async function searchLinkedInProfile(keywords: string): Promise<{ profileURL: string; html: string }> {
+  // Plain keyword search — no site: operator, which both Google and Bing treat
+  // as a bot signal and CAPTCHA. Appending "linkedin" steers results toward
+  // LinkedIn profile pages without triggering operator-based bot detection.
+  const query = `${keywords} linkedin`;
+  const searchURL = `https://www.bing.com/search?q=${encodeURIComponent(query)}&setlang=en`;
+
+  const browser = await pool.acquire();
+  let page: Page | undefined;
+  try {
+    page = await setupPage(browser);
+
+    const cdp = await page.createCDPSession();
+    await cdp.send("Network.clearBrowserCookies");
+    await cdp.detach();
+
+    console.log(`[search] step 1: Bing search — ${searchURL}`);
+    try {
+      await page.goto(searchURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    } catch (e: any) {
+      if (!String(e).includes("timeout") && !String(e).includes("Timeout")) throw e;
+    }
+
+    console.log(`[search] title: "${await page.title()}"  url: ${page.url()}`);
+
+    const bodySnippet = await page.evaluate(() =>
+      document.body?.innerText?.slice(0, 200) ?? "(no body)"
+    );
+    console.log(`[search] body snippet: ${bodySnippet.replace(/\n/g, " ")}`);
+
+    // Extract the first LinkedIn profile URL from Bing SERP.
+    // Bing result links use opaque redirect hrefs (bing.com/ck/a?...) — the actual
+    // destination URL is only available as plain text inside <cite> elements.
+    // The cite text looks like: "https://au.linkedin.com › in › guidebee"
+    const foundURL: string = await page.evaluate(() => {
+      // Primary: cite text (the display URL Bing shows under each result title)
+      const cites = Array.from(document.querySelectorAll("cite"));
+      for (const cite of cites) {
+        const text = (cite.textContent ?? "").replace(/\s*[›>]\s*/g, "/").trim();
+        const m = text.match(/(?:https?:\/\/)?(?:[a-z]+\.)?linkedin\.com\/in\/([^/?#&\s]+)/i);
+        if (m && m[1]) return `https://www.linkedin.com/in/${m[1]}/`;
+      }
+      // Fallback: direct href if Bing happens to include one
+      const links = Array.from(document.querySelectorAll("a[href]")) as HTMLAnchorElement[];
+      for (const a of links) {
+        const href = a.href ?? "";
+        const m = href.match(/linkedin\.com\/in\/([^/?#&]+)/);
+        if (m && m[1]) return `https://www.linkedin.com/in/${m[1]}/`;
+      }
+      return "";
+    });
+
+    if (!foundURL) {
+      throw new Error(`No LinkedIn profile found for keywords: ${keywords}`);
+    }
+    console.log(`[search] found profile URL: ${foundURL}`);
+
+    // Click the first Bing organic result title — it goes through Bing's redirect
+    // to LinkedIn, so LinkedIn sees Referer: https://www.bing.com/ (trusted).
+    let clicked = false;
+    for (const sel of [
+      "li.b_algo h2 a",       // first organic Bing result title link
+      "a[href*='linkedin.com/in/']", // direct href fallback
+    ]) {
+      const el = await page.$(sel);
+      if (!el) continue;
+      const href = await el.evaluate((a) => a.getAttribute("href"));
+      console.log(`[search] clicking: ${(href ?? "").slice(0, 80)}`);
+      try {
+        await Promise.all([
+          page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 30_000 }),
+          el.click(),
+        ]);
+        clicked = true;
+        break;
+      } catch (e: any) {
+        console.log(`[search] click/nav error: ${e.message}`);
+      }
+    }
+
+    if (!clicked) {
+      console.log(`[search] no link clicked — navigating directly to ${foundURL}`);
+      try {
+        await page.goto(foundURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
+      } catch (e: any) {
+        if (!String(e).includes("timeout") && !String(e).includes("Timeout")) throw e;
+      }
+    }
+
+    const liTitle = await page.title();
+    const liURL = page.url();
+    console.log(`[search] LinkedIn title: "${liTitle}"  url: ${liURL}`);
+
+    if (
+      liTitle.toLowerCase().includes("linkedin login") ||
+      liTitle.toLowerCase().includes("sign in") ||
+      liURL.includes("/login") ||
+      liURL.includes("/authwall")
+    ) {
+      throw new Error(
+        `LinkedIn redirected to login wall (title: "${liTitle}"). ` +
+        `Try again in a few minutes or configure a residential proxy.`
+      );
+    }
+
+    await new Promise((r) => setTimeout(r, 3_000));
+    const html = await page.content();
+    console.log(`[search] got ${html.length} bytes from ${liURL}`);
+    return { profileURL: liURL, html };
 
   } finally {
     if (page) await page.close().catch(() => {});
@@ -561,6 +704,35 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[api] /fetch-linkedin error: ${msg}`);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: msg }));
+    }
+    return;
+  }
+
+  // POST /search-linkedin  — keyword search → first LinkedIn profile → HTML
+  if (url.pathname === "/search-linkedin" && req.method === "POST") {
+    let body: { keywords?: string };
+    try {
+      body = JSON.parse(await readBody(req));
+    } catch {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "invalid JSON body" }));
+      return;
+    }
+    if (!body.keywords) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "missing field: keywords" }));
+      return;
+    }
+    console.log(`[api] /search-linkedin keywords="${body.keywords}"`);
+    try {
+      const result = await searchLinkedInProfile(body.keywords);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ html: result.html, profileURL: result.profileURL }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[api] /search-linkedin error: ${msg}`);
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: msg }));
     }

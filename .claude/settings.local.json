@@ -21,7 +21,10 @@
       "Bash(go vet *)",
       "Bash(npm install *)",
       "Bash(node_modules/.bin/tsc --noEmit)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(xargs grep *)",
+      "Bash(git -C \"C:/workspace/jobseeker\" log --oneline --all)",
+      "Bash(git -C \"C:/workspace/jobseeker\" log --all --oneline)"
     ],
     "deny": [],
     "ask": []
