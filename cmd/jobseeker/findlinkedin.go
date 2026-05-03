@@ -94,8 +94,9 @@ func runFindLinkedIn(cmd *cobra.Command, args []string) {
 		if parseErr == nil {
 			break
 		}
-		if errors.Is(parseErr, linkedinpkg.ErrNonEnglishPage) && attempt < maxParseRetries {
-			log.Printf("Attempt %d: non-English page — re-fetching %s in 5s...", attempt, profileURL)
+		retryable := errors.Is(parseErr, linkedinpkg.ErrNonEnglishPage) || errors.Is(parseErr, linkedinpkg.ErrBlocked)
+		if retryable && attempt < maxParseRetries {
+			log.Printf("Attempt %d/%d: %v — re-fetching %s in 5s...", attempt, maxParseRetries, parseErr, profileURL)
 			time.Sleep(5 * time.Second)
 			var fetchErr error
 			if puppeteerClient != nil {
