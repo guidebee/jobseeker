@@ -202,13 +202,18 @@ const pool = new BrowserPool(POOL_SIZE);
 async function setupPage(browser: Browser): Promise<Page> {
   const page = await browser.newPage();
   await page.setViewport(pickRandom(VIEWPORTS));
-  await page.setUserAgent(pickRandom(USER_AGENTS));
+  const ua = pickRandom(USER_AGENTS);
+  await page.setUserAgent(ua);
   // Proxy auth is handled by the local relay — no page.authenticate() needed.
-  // Referer and Accept-Language make the request look like a real browser
-  // navigating from a Google search result.
+  // Do NOT set a global Referer here: setting Referer=google.com when navigating
+  // TO Google is circular and a known bot signal. Each operation sets its own
+  // Referer via natural link clicks or explicit header overrides.
   await page.setExtraHTTPHeaders({
-    "Referer": "https://www.google.com/search?q=linkedin+profile",
     "Accept-Language": "en-US,en;q=0.9",
+    // Chrome client-hint headers — headless Chrome omits these, making it detectable.
+    "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
   });
   return page;
 }
@@ -267,29 +272,38 @@ async function setGoogleConsentCookie(page: Page): Promise<void> {
   }
 }
 
-// acceptGoogleConsent clicks "Accept all" on Google's cookie consent page if present.
-// Google shows this page on first visit in many regions (AU, EU, etc.).
-async function acceptGoogleConsent(page: Page): Promise<void> {
+// acceptGoogleConsent clicks "Accept all" on Google's GDPR consent page if present.
+// Returns true if a consent page was detected (regardless of whether the click worked).
+// Does NOT handle /sorry/ CAPTCHA pages — those are handled separately.
+async function acceptGoogleConsent(page: Page): Promise<boolean> {
+  const currentURL = page.url();
+  // /sorry/index is a bot-detection CAPTCHA page, not a consent page.
+  // Bail out immediately so the caller can throw a meaningful CAPTCHA error.
+  if (currentURL.includes("/sorry/")) {
+    console.log(`[google] CAPTCHA page detected (${currentURL.slice(0, 80)}) — not a consent page`);
+    return false;
+  }
+
   const title = await page.title();
-  // Consent page titles: "Before you continue to Google Search", "Avant de continuer", etc.
-  // Also detect when document.title is the raw URL (another consent page symptom).
+  // Consent page: title is "Before you continue to Google Search", a locale variant,
+  // or the raw URL when document.title is unset (consent.google.com behaviour).
+  // Exclude sorry-page URLs that also surface as raw-URL titles.
   const isConsentPage =
     title.includes("Before you continue") ||
     title.includes("Avant de continuer") ||
-    title.startsWith("https://") ||
-    title === "";
+    ((title.startsWith("https://") || title === "") && !currentURL.includes("/sorry/"));
 
-  if (!isConsentPage) return;
+  if (!isConsentPage) return false;
 
-  console.log(`[linkedin] Google consent page detected (title: "${title}") — accepting`);
+  console.log(`[google] consent page detected (title: "${title}") — accepting`);
 
   // Try common "Accept all" button selectors across locales.
   for (const sel of [
     'button[aria-label*="Accept all"]',
     'button[aria-label*="Tout accepter"]',
-    "button#L2AGLb",          // common ID for the accept button
+    "button#L2AGLb",
     'form[action*="consent"] button',
-    'div[role="none"] button', // fallback
+    'div[role="none"] button',
   ]) {
     try {
       await page.waitForSelector(sel, { timeout: 3_000 });
@@ -297,13 +311,14 @@ async function acceptGoogleConsent(page: Page): Promise<void> {
         page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 15_000 }),
         page.click(sel),
       ]);
-      console.log(`[linkedin] consent accepted via "${sel}"`);
-      return;
+      console.log(`[google] consent accepted via "${sel}"`);
+      return true;
     } catch {
       // selector not present — try next
     }
   }
-  console.log("[linkedin] could not find consent accept button — continuing anyway");
+  console.log("[google] could not find consent accept button — continuing anyway");
+  return true;
 }
 
 async function fetchLinkedInHTML(profileURL: string): Promise<string> {
@@ -428,6 +443,12 @@ async function fetchLinkedInViaGoogle(profileURL: string): Promise<string> {
 
     // Handle Google cookie consent page (common on first visit in AU/EU).
     await acceptGoogleConsent(page);
+    if (page.url().includes("/sorry/")) {
+      throw new Error(
+        `Google blocked the request with a CAPTCHA (bot detection). ` +
+        `Try again later or configure a residential proxy.`
+      );
+    }
     console.log(`[linkedin] post-consent title: "${await page.title()}"`);
 
     // Log page body snippet to confirm we have search results.
@@ -506,12 +527,15 @@ async function fetchLinkedInViaGoogle(profileURL: string): Promise<string> {
 // LinkedIn keyword search  (Google site:linkedin.com/in + keywords → HTML)
 // ---------------------------------------------------------------------------
 
-async function searchLinkedInProfile(keywords: string): Promise<{ profileURL: string; html: string }> {
+async function searchLinkedInProfile(keywords: string, engine: string = "bing"): Promise<{ profileURL: string; html: string }> {
   // Plain keyword search — no site: operator, which both Google and Bing treat
   // as a bot signal and CAPTCHA. Appending "linkedin" steers results toward
   // LinkedIn profile pages without triggering operator-based bot detection.
   const query = `${keywords} linkedin`;
-  const searchURL = `https://www.bing.com/search?q=${encodeURIComponent(query)}&setlang=en`;
+  const useGoogle = engine.toLowerCase() === "google";
+  const searchURL = useGoogle
+    ? `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=en`
+    : `https://www.bing.com/search?q=${encodeURIComponent(query)}&setlang=en`;
 
   const browser = await pool.acquire();
   let page: Page | undefined;
@@ -522,11 +546,38 @@ async function searchLinkedInProfile(keywords: string): Promise<{ profileURL: st
     await cdp.send("Network.clearBrowserCookies");
     await cdp.detach();
 
-    console.log(`[search] step 1: Bing search — ${searchURL}`);
+    if (useGoogle) {
+      await setGoogleConsentCookie(page);
+
+      // Warm up: visit google.com home before the search URL.
+      // A real user session starts at the home page; jumping directly to a search
+      // URL from a cold headless browser is a detectable pattern.
+      console.log("[search] warm-up: visiting google.com");
+      try {
+        await page.goto("https://www.google.com/", { waitUntil: "domcontentloaded", timeout: 15_000 });
+      } catch (e: any) {
+        if (!String(e).includes("timeout") && !String(e).includes("Timeout")) throw e;
+      }
+      // Small random pause — mimics the time a human spends before typing a query.
+      await new Promise((r) => setTimeout(r, 500 + Math.random() * 1000));
+    }
+
+    console.log(`[search] step 1: ${useGoogle ? "Google" : "Bing"} search — ${searchURL}`);
     try {
       await page.goto(searchURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
     } catch (e: any) {
       if (!String(e).includes("timeout") && !String(e).includes("Timeout")) throw e;
+    }
+
+    if (useGoogle) {
+      await acceptGoogleConsent(page);
+      // Throw immediately if Google is showing a CAPTCHA — no point extracting URLs.
+      if (page.url().includes("/sorry/")) {
+        throw new Error(
+          `Google blocked the search with a CAPTCHA (bot detection). ` +
+          `Use --search-engine=bing instead, or configure a residential proxy.`
+        );
+      }
     }
 
     console.log(`[search] title: "${await page.title()}"  url: ${page.url()}`);
@@ -536,40 +587,50 @@ async function searchLinkedInProfile(keywords: string): Promise<{ profileURL: st
     );
     console.log(`[search] body snippet: ${bodySnippet.replace(/\n/g, " ")}`);
 
-    // Extract the first LinkedIn profile URL from Bing SERP.
-    // Bing result links use opaque redirect hrefs (bing.com/ck/a?...) — the actual
-    // destination URL is only available as plain text inside <cite> elements.
-    // The cite text looks like: "https://au.linkedin.com › in › guidebee"
-    const foundURL: string = await page.evaluate(() => {
-      // Primary: cite text (the display URL Bing shows under each result title)
-      const cites = Array.from(document.querySelectorAll("cite"));
-      for (const cite of cites) {
-        const text = (cite.textContent ?? "").replace(/\s*[›>]\s*/g, "/").trim();
-        const m = text.match(/(?:https?:\/\/)?(?:[a-z]+\.)?linkedin\.com\/in\/([^/?#&\s]+)/i);
-        if (m && m[1]) return `https://www.linkedin.com/in/${m[1]}/`;
-      }
-      // Fallback: direct href if Bing happens to include one
-      const links = Array.from(document.querySelectorAll("a[href]")) as HTMLAnchorElement[];
-      for (const a of links) {
-        const href = a.href ?? "";
-        const m = href.match(/linkedin\.com\/in\/([^/?#&]+)/);
-        if (m && m[1]) return `https://www.linkedin.com/in/${m[1]}/`;
-      }
-      return "";
-    });
+    // Extract the first LinkedIn profile URL from the SERP.
+    // Bing result links use opaque redirect hrefs (bing.com/ck/a?...) so the actual
+    // URL must be read from <cite> text elements.
+    // Google result links have the destination URL directly in href.
+    const foundURL: string = useGoogle
+      ? await page.evaluate(() => {
+          const links = Array.from(document.querySelectorAll("a[href]")) as HTMLAnchorElement[];
+          for (const a of links) {
+            const href = a.href ?? "";
+            const m = href.match(/linkedin\.com\/in\/([^/?#&]+)/);
+            if (m && m[1]) return `https://www.linkedin.com/in/${m[1]}/`;
+          }
+          return "";
+        })
+      : await page.evaluate(() => {
+          // Primary: cite text (the display URL Bing shows under each result title)
+          const cites = Array.from(document.querySelectorAll("cite"));
+          for (const cite of cites) {
+            const text = (cite.textContent ?? "").replace(/\s*[›>]\s*/g, "/").trim();
+            const m = text.match(/(?:https?:\/\/)?(?:[a-z]+\.)?linkedin\.com\/in\/([^/?#&\s]+)/i);
+            if (m && m[1]) return `https://www.linkedin.com/in/${m[1]}/`;
+          }
+          // Fallback: direct href if Bing happens to include one
+          const links = Array.from(document.querySelectorAll("a[href]")) as HTMLAnchorElement[];
+          for (const a of links) {
+            const href = a.href ?? "";
+            const m = href.match(/linkedin\.com\/in\/([^/?#&]+)/);
+            if (m && m[1]) return `https://www.linkedin.com/in/${m[1]}/`;
+          }
+          return "";
+        });
 
     if (!foundURL) {
       throw new Error(`No LinkedIn profile found for keywords: ${keywords}`);
     }
     console.log(`[search] found profile URL: ${foundURL}`);
 
-    // Click the first Bing organic result title — it goes through Bing's redirect
-    // to LinkedIn, so LinkedIn sees Referer: https://www.bing.com/ (trusted).
+    // Click the first matching result link so LinkedIn sees an authentic Referer.
+    const clickSelectors = useGoogle
+      ? ["a[href*='linkedin.com/in/']", "div#search h3 a"]
+      : ["li.b_algo h2 a", "a[href*='linkedin.com/in/']"];
+
     let clicked = false;
-    for (const sel of [
-      "li.b_algo h2 a",       // first organic Bing result title link
-      "a[href*='linkedin.com/in/']", // direct href fallback
-    ]) {
+    for (const sel of clickSelectors) {
       const el = await page.$(sel);
       if (!el) continue;
       const href = await el.evaluate((a) => a.getAttribute("href"));
@@ -712,7 +773,7 @@ const server = http.createServer(async (req, res) => {
 
   // POST /search-linkedin  — keyword search → first LinkedIn profile → HTML
   if (url.pathname === "/search-linkedin" && req.method === "POST") {
-    let body: { keywords?: string };
+    let body: { keywords?: string; engine?: string };
     try {
       body = JSON.parse(await readBody(req));
     } catch {
@@ -725,9 +786,10 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: "missing field: keywords" }));
       return;
     }
-    console.log(`[api] /search-linkedin keywords="${body.keywords}"`);
+    const engine = body.engine ?? "bing";
+    console.log(`[api] /search-linkedin keywords="${body.keywords}" engine="${engine}"`);
     try {
-      const result = await searchLinkedInProfile(body.keywords);
+      const result = await searchLinkedInProfile(body.keywords, engine);
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ html: result.html, profileURL: result.profileURL }));
     } catch (err) {
