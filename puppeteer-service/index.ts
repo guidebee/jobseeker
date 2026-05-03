@@ -4,6 +4,7 @@ import net from "net";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import type { Browser, Page } from "puppeteer";
+import { getJson } from "serpapi";
 
 puppeteer.use(StealthPlugin());
 
@@ -14,6 +15,8 @@ puppeteer.use(StealthPlugin());
 const PORT = Number(process.env.PUPPETEER_SERVICE_PORT ?? 3001);
 const POOL_SIZE = Number(process.env.PUPPETEER_POOL_SIZE ?? 2);
 const CHROME_EXECUTABLE = process.env.PUPPETEER_EXECUTABLE_PATH;
+
+const SERPAPI_KEY = process.env.SERPAPI_KEY ?? "";
 
 const PROXY_HOST = process.env.SCAN_PROXY_HOST ?? "";
 const PROXY_PORT_NUM = Number(process.env.SCAN_PROXY_PORT ?? 823);
@@ -141,6 +144,7 @@ class BrowserPool {
     const args = [
       "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
       "--lang=en-US", "--accept-lang=en-US",
+      "--disable-blink-features=AutomationControlled",
     ];
     if (PROXY_ENABLED) {
       if (PROXY_USER) {
@@ -148,16 +152,20 @@ class BrowserPool {
         // into every CONNECT handshake (page.authenticate() is broken in Puppeteer v22).
         const port = await startLocalProxyRelay(PROXY_HOST, PROXY_PORT_NUM, PROXY_USER, PROXY_PASS);
         args.push(`--proxy-server=http://127.0.0.1:${port}`);
-        console.log(`[pool] proxy via relay 127.0.0.1:${port} → ${PROXY_HOST}:${PROXY_PORT_NUM}  auth=yes`);
+        args.push("--proxy-bypass-list=*.google.com,*.googleapis.com,*.gstatic.com,*.bing.com");
+        console.log(`[pool] proxy via relay 127.0.0.1:${port} → ${PROXY_HOST}:${PROXY_PORT_NUM}  auth=yes  google=direct`);
       } else {
         // No credentials: IP-whitelist mode — point Chrome directly at the proxy.
         args.push(`--proxy-server=http://${PROXY_HOST}:${PROXY_PORT_NUM}`);
-        console.log(`[pool] proxy: ${PROXY_HOST}:${PROXY_PORT_NUM}  auth=no (IP whitelist)`);
+        // Bypass proxy for Google — use local IP there (avoids geo-mismatch CAPTCHAs).
+        // LinkedIn still goes through the residential proxy.
+        args.push("--proxy-bypass-list=*.google.com,*.googleapis.com,*.gstatic.com,*.bing.com");
+        console.log(`[pool] proxy: ${PROXY_HOST}:${PROXY_PORT_NUM}  auth=no (IP whitelist)  google=direct`);
       }
     }
     const launches = Array.from({ length: this.size }, () =>
       puppeteer.launch({
-        headless: true,
+        headless: "new",
         ...(CHROME_EXECUTABLE ? { executablePath: CHROME_EXECUTABLE } : {}),
         args,
       }) as Promise<Browser>
@@ -367,6 +375,12 @@ async function fetchLinkedInDirect(profileURL: string): Promise<string> {
     const url = page.url();
     console.log(`[linkedin] title: "${title}"  url: ${url}`);
 
+    // Empty title or bare "LinkedIn" title means LinkedIn served the homepage/login
+    // wall instead of the profile (bot detection or session block).
+    if (title === "" || title.trim() === "LinkedIn") {
+      throw new Error(`non-English content detected (title: "${title}") — LinkedIn returned homepage instead of profile (bot detection)`);
+    }
+
     // Non-ASCII title = Arabic, Chinese, etc. from a GeoIP-mismatched proxy IP.
     // Throw a retryable error so fetchLinkedInHTML can pick a different IP.
     if (/[^\x00-\x7F]/.test(title)) {
@@ -527,15 +541,47 @@ async function fetchLinkedInViaGoogle(profileURL: string): Promise<string> {
 // LinkedIn keyword search  (Google site:linkedin.com/in + keywords → HTML)
 // ---------------------------------------------------------------------------
 
-async function searchLinkedInProfile(keywords: string, engine: string = "bing"): Promise<{ profileURL: string; html: string }> {
-  // Plain keyword search — no site: operator, which both Google and Bing treat
-  // as a bot signal and CAPTCHA. Appending "linkedin" steers results toward
-  // LinkedIn profile pages without triggering operator-based bot detection.
+async function searchLinkedInProfileGoogle(keywords: string): Promise<{ profileURL: string; html: string }> {
+  if (!SERPAPI_KEY) throw new Error("SERPAPI_KEY is not set in .env");
+
   const query = `${keywords} linkedin`;
-  const useGoogle = engine.toLowerCase() === "google";
-  const searchURL = useGoogle
-    ? `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=en`
-    : `https://www.bing.com/search?q=${encodeURIComponent(query)}&setlang=en`;
+  console.log(`[serpapi] searching: ${query}`);
+
+  const response = await getJson({
+    engine: "google",
+    api_key: SERPAPI_KEY,
+    q: query,
+    num: 10,
+  });
+
+  const results: any[] = response["organic_results"] ?? [];
+  let profileURL = "";
+  for (const result of results) {
+    const link: string = result["link"] ?? "";
+    const m = link.match(/linkedin\.com\/in\/([^/?#&]+)/);
+    if (m && m[1]) {
+      profileURL = `https://www.linkedin.com/in/${m[1]}/`;
+      break;
+    }
+  }
+
+  if (!profileURL) {
+    throw new Error(`No LinkedIn profile found via SerpAPI for keywords: ${keywords}`);
+  }
+  console.log(`[serpapi] found profile URL: ${profileURL}`);
+
+  const html = await fetchLinkedInHTML(profileURL);
+  return { profileURL, html };
+}
+
+async function searchLinkedInProfile(keywords: string, engine: string = "bing"): Promise<{ profileURL: string; html: string }> {
+  if (engine.toLowerCase() === "google") {
+    return searchLinkedInProfileGoogle(keywords);
+  }
+
+  // Bing path — Puppeteer-based (unchanged)
+  const query = `${keywords} linkedin`;
+  const searchURL = `https://www.bing.com/search?q=${encodeURIComponent(query)}&setlang=en`;
 
   const browser = await pool.acquire();
   let page: Page | undefined;
@@ -546,38 +592,11 @@ async function searchLinkedInProfile(keywords: string, engine: string = "bing"):
     await cdp.send("Network.clearBrowserCookies");
     await cdp.detach();
 
-    if (useGoogle) {
-      await setGoogleConsentCookie(page);
-
-      // Warm up: visit google.com home before the search URL.
-      // A real user session starts at the home page; jumping directly to a search
-      // URL from a cold headless browser is a detectable pattern.
-      console.log("[search] warm-up: visiting google.com");
-      try {
-        await page.goto("https://www.google.com/", { waitUntil: "domcontentloaded", timeout: 15_000 });
-      } catch (e: any) {
-        if (!String(e).includes("timeout") && !String(e).includes("Timeout")) throw e;
-      }
-      // Small random pause — mimics the time a human spends before typing a query.
-      await new Promise((r) => setTimeout(r, 500 + Math.random() * 1000));
-    }
-
-    console.log(`[search] step 1: ${useGoogle ? "Google" : "Bing"} search — ${searchURL}`);
+    console.log(`[search] step 1: Bing search — ${searchURL}`);
     try {
       await page.goto(searchURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
     } catch (e: any) {
       if (!String(e).includes("timeout") && !String(e).includes("Timeout")) throw e;
-    }
-
-    if (useGoogle) {
-      await acceptGoogleConsent(page);
-      // Throw immediately if Google is showing a CAPTCHA — no point extracting URLs.
-      if (page.url().includes("/sorry/")) {
-        throw new Error(
-          `Google blocked the search with a CAPTCHA (bot detection). ` +
-          `Use --search-engine=bing instead, or configure a residential proxy.`
-        );
-      }
     }
 
     console.log(`[search] title: "${await page.title()}"  url: ${page.url()}`);
@@ -587,50 +606,34 @@ async function searchLinkedInProfile(keywords: string, engine: string = "bing"):
     );
     console.log(`[search] body snippet: ${bodySnippet.replace(/\n/g, " ")}`);
 
-    // Extract the first LinkedIn profile URL from the SERP.
+    // Extract the first LinkedIn profile URL from Bing results.
     // Bing result links use opaque redirect hrefs (bing.com/ck/a?...) so the actual
     // URL must be read from <cite> text elements.
-    // Google result links have the destination URL directly in href.
-    const foundURL: string = useGoogle
-      ? await page.evaluate(() => {
-          const links = Array.from(document.querySelectorAll("a[href]")) as HTMLAnchorElement[];
-          for (const a of links) {
-            const href = a.href ?? "";
-            const m = href.match(/linkedin\.com\/in\/([^/?#&]+)/);
-            if (m && m[1]) return `https://www.linkedin.com/in/${m[1]}/`;
-          }
-          return "";
-        })
-      : await page.evaluate(() => {
-          // Primary: cite text (the display URL Bing shows under each result title)
-          const cites = Array.from(document.querySelectorAll("cite"));
-          for (const cite of cites) {
-            const text = (cite.textContent ?? "").replace(/\s*[›>]\s*/g, "/").trim();
-            const m = text.match(/(?:https?:\/\/)?(?:[a-z]+\.)?linkedin\.com\/in\/([^/?#&\s]+)/i);
-            if (m && m[1]) return `https://www.linkedin.com/in/${m[1]}/`;
-          }
-          // Fallback: direct href if Bing happens to include one
-          const links = Array.from(document.querySelectorAll("a[href]")) as HTMLAnchorElement[];
-          for (const a of links) {
-            const href = a.href ?? "";
-            const m = href.match(/linkedin\.com\/in\/([^/?#&]+)/);
-            if (m && m[1]) return `https://www.linkedin.com/in/${m[1]}/`;
-          }
-          return "";
-        });
+    const foundURL: string = await page.evaluate(() => {
+      // Primary: cite text (the display URL Bing shows under each result title)
+      const cites = Array.from(document.querySelectorAll("cite"));
+      for (const cite of cites) {
+        const text = (cite.textContent ?? "").replace(/\s*[›>]\s*/g, "/").trim();
+        const m = text.match(/(?:https?:\/\/)?(?:[a-z]+\.)?linkedin\.com\/in\/([^/?#&\s]+)/i);
+        if (m && m[1]) return `https://www.linkedin.com/in/${m[1]}/`;
+      }
+      // Fallback: direct href if Bing happens to include one
+      const links = Array.from(document.querySelectorAll("a[href]")) as HTMLAnchorElement[];
+      for (const a of links) {
+        const href = a.href ?? "";
+        const m = href.match(/linkedin\.com\/in\/([^/?#&]+)/);
+        if (m && m[1]) return `https://www.linkedin.com/in/${m[1]}/`;
+      }
+      return "";
+    });
 
     if (!foundURL) {
       throw new Error(`No LinkedIn profile found for keywords: ${keywords}`);
     }
     console.log(`[search] found profile URL: ${foundURL}`);
 
-    // Click the first matching result link so LinkedIn sees an authentic Referer.
-    const clickSelectors = useGoogle
-      ? ["a[href*='linkedin.com/in/']", "div#search h3 a"]
-      : ["li.b_algo h2 a", "a[href*='linkedin.com/in/']"];
-
     let clicked = false;
-    for (const sel of clickSelectors) {
+    for (const sel of ["li.b_algo h2 a", "a[href*='linkedin.com/in/']"]) {
       const el = await page.$(sel);
       if (!el) continue;
       const href = await el.evaluate((a) => a.getAttribute("href"));

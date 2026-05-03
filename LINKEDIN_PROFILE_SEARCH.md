@@ -140,47 +140,86 @@ jobseeker findlinkedin John Smith "Senior Engineer" Google Sydney
 jobseeker findlinkedin "Sarah Johnson"
 ```
 
+### Search engines
+
+The `--search-engine` flag selects how profile URLs are discovered:
+
+| Flag | Backend | Notes |
+|------|---------|-------|
+| _(default)_ `--search-engine=bing` | Puppeteer + Bing SERP | No API key required |
+| `--search-engine=google` | SerpAPI (Google) | Requires `SERPAPI_KEY` in `puppeteer-service/.env` |
+
+### Examples
+
+```bash
+# Bing search — default, no flag needed, no API key required
+./jobseeker.exe findlinkedin James Shen Australia "Victorian Electoral Commission"
+
+# Same as above — explicit flag (same result)
+./jobseeker.exe findlinkedin James Shen Australia "Victorian Electoral Commission" --search-engine=bing
+
+# Google search via SerpAPI — requires SERPAPI_KEY in puppeteer-service/.env
+./jobseeker.exe findlinkedin James Shen Australia guidebee "Victorian Electoral Commission" --search-engine=google
+```
+
 ### How it works
 
 The command runs in two phases:
 
+**Phase 1 — Discover the profile URL**
+
+*Bing (default):*
 ```
-Phase 1 — Discover the profile URL via Bing
-──────────────────────────────────────────────────────────────────────
- CLI → POST /search-linkedin { keywords } → Puppeteer service
+CLI → POST /search-linkedin { keywords, engine: "bing" } → Puppeteer service
 
- Puppeteer service:
-   1. Clear browser cookies
-   2. Navigate to Bing: "James Shen Victorian Electoral Commission linkedin"
-      (plain keyword query — no site: operator, which triggers bot CAPTCHAs)
-   3. Read <cite> display URLs in Bing SERP
-      (Bing result links are opaque redirects; the real URL is only in <cite> text)
-   4. Extract first linkedin.com/in/ URL
-   5. Click first Bing result title → navigate to LinkedIn
-      (Bing referral: LinkedIn sees Referer: https://www.bing.com/)
-   6. Return HTML + resolved profile URL
-
-Phase 2 — Parse the profile HTML
-──────────────────────────────────────────────────────────────────────
- CLI: ParseHTML(html, profileURL)
-   → if ErrNonEnglishPage: re-fetch via FetchLinkedIn(profileURL) and retry
-   → if success: optional Claude skill inference → print CV
+Puppeteer service:
+  1. Clear browser cookies
+  2. Navigate to Bing: "James Shen Victorian Electoral Commission linkedin"
+     (plain keyword query — no site: operator, which triggers bot CAPTCHAs)
+  3. Read <cite> display URLs in Bing SERP
+     (Bing result links are opaque redirects; the real URL is only in <cite> text)
+  4. Extract first linkedin.com/in/ URL
+  5. Click first Bing result title → navigate to LinkedIn
+     (Bing referral: LinkedIn sees Referer: https://www.bing.com/)
+  6. Return HTML + resolved profile URL
 ```
 
-### Why Bing instead of Google?
+*Google (`--search-engine=google`):*
+```
+CLI → POST /search-linkedin { keywords, engine: "google" } → Puppeteer service
 
-Google detects `site:linkedin.com/in` operator queries from headless browsers and shows a CAPTCHA. A plain keyword query like `James Shen linkedin` avoids the operator but Google still CAPTCHAs aggressively on search from datacenter/headless IPs.
+Puppeteer service:
+  1. Call SerpAPI with query "James Shen Victorian Electoral Commission linkedin"
+  2. Extract first linkedin.com/in/ URL from organic_results JSON
+  3. Fetch LinkedIn profile HTML via residential proxy (fetchLinkedInHTML)
+  4. Return HTML + resolved profile URL
+```
 
-Bing serves these results to headless browsers without a CAPTCHA, making it the reliable choice for automated profile discovery.
+**Phase 2 — Parse the profile HTML** _(same for both engines)_
+```
+CLI: ParseHTML(html, profileURL)
+  → if ErrNonEnglishPage or ErrBlocked: re-fetch via FetchLinkedIn(profileURL) and retry
+  → if success: optional Claude skill inference → print CV
+```
+
+### Why Google search requires SerpAPI
+
+Headless browsers (even with a residential proxy and stealth plugins) are consistently blocked by Google's bot detection on search pages. Google uses multiple signals beyond the IP address — TLS fingerprint, browser automation flags, request patterns — and serves a `/sorry/index` CAPTCHA page before any results load.
+
+Attempts made to work around this (real Chrome executable, `--disable-blink-features=AutomationControlled`, typing queries into the search box, mouse simulation, proxy bypass for Google) all failed because Google's detection operates at a level that cannot be fully spoofed by a headless browser.
+
+SerpAPI is a paid service that runs real browsers in their own infrastructure and returns clean JSON results. It has no CAPTCHA problem by design. The residential proxy is still used for the subsequent LinkedIn fetch — only the Google search step is offloaded to SerpAPI.
+
+To enable: add `SERPAPI_KEY=your_key` to `puppeteer-service/.env`. Get a key at https://serpapi.com/manage-api-key (100 free searches/month).
 
 ### Retry behaviour
 
 | Phase | Max retries | Retry trigger |
 |-------|-------------|---------------|
-| Search (Bing → LinkedIn URL → HTML) | 5 | Any error (network, timeout, no result) |
-| Parse (HTML → Profile struct) | 5 | `ErrNonEnglishPage` — re-fetches HTML each time |
+| Search (→ LinkedIn URL → HTML) | 5 | Any error (network, timeout, no result) |
+| Parse (HTML → Profile struct) | 5 | `ErrNonEnglishPage` or `ErrBlocked` — re-fetches HTML each time |
 
-Non-English pages happen when the residential proxy IP resolves to a non-English region. Each re-fetch picks a fresh session, which may land on a different IP.
+Non-English or blocked pages happen when the residential proxy IP is rate-limited or geolocated to a non-English region. Each re-fetch picks a fresh browser session, which may land on a different proxy IP.
 
 ---
 
@@ -277,6 +316,7 @@ Set these in `puppeteer-service/.env`:
 | `SCAN_PROXY_PORT` | `823` | Proxy port |
 | `SCAN_PROXY_USER` | — | Proxy username — leave blank for IP whitelist mode (recommended) |
 | `SCAN_PROXY_PASS` | — | Proxy password — leave blank for IP whitelist mode (recommended) |
+| `SERPAPI_KEY` | — | SerpAPI key — required for `--search-engine=google` |
 | `SKIP_GOOGLE_SEARCH` | `false` | `true` = navigate to LinkedIn directly; `false` = go via Google SERP click |
 | `PUPPETEER_SERVICE_PORT` | `3001` | HTTP port the service listens on |
 | `PUPPETEER_POOL_SIZE` | `2` | Number of persistent browser instances |

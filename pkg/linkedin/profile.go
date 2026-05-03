@@ -94,6 +94,10 @@ var (
 // Callers may retry on this error.
 var ErrNonEnglishPage = fmt.Errorf("LinkedIn returned a non-English page (likely an error or redirect) — retry may help")
 
+// ErrBlocked is returned when LinkedIn returned no usable profile data,
+// likely due to a login wall or bot block. Callers may retry on this error.
+var ErrBlocked = fmt.Errorf("LinkedIn blocked the request or returned a login wall — retry may help")
+
 // isNonLatinText returns true when s contains no ASCII letters or digits,
 // which indicates the text is from a non-English error page.
 func isNonLatinText(s string) bool {
@@ -116,7 +120,7 @@ func ParseHTML(html, profileURL string) (*Profile, error) {
 		_ = err
 	}
 	if profile.Name == "" {
-		return nil, fmt.Errorf("could not extract profile data from HTML (LinkedIn may have blocked the request or returned a login wall)")
+		return nil, fmt.Errorf("%w", ErrBlocked)
 	}
 	if isNonLatinText(profile.Name) {
 		return nil, fmt.Errorf("%w (got name: %q)", ErrNonEnglishPage, profile.Name)
