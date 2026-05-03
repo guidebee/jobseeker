@@ -135,12 +135,13 @@ type searchLinkedInResponse struct {
 	Error      string `json:"error"`
 }
 
-// SearchLinkedIn does a Google keyword search (site:linkedin.com/in KEYWORDS),
+// SearchLinkedIn does a keyword search via the given engine ("bing" or "google"),
 // finds the first matching LinkedIn profile, and returns its URL and HTML.
-func (c *Client) SearchLinkedIn(keywords string) (profileURL, html string, err error) {
+func (c *Client) SearchLinkedIn(keywords, searchEngine string) (profileURL, html string, err error) {
 	reqBody := struct {
 		Keywords string `json:"keywords"`
-	}{Keywords: keywords}
+		Engine   string `json:"engine,omitempty"`
+	}{Keywords: keywords, Engine: searchEngine}
 
 	data, err := json.Marshal(reqBody)
 	if err != nil {
