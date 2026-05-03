@@ -24,7 +24,12 @@
       "Bash(npx tsc *)",
       "Bash(xargs grep *)",
       "Bash(git -C \"C:/workspace/jobseeker\" log --oneline --all)",
-      "Bash(git -C \"C:/workspace/jobseeker\" log --all --oneline)"
+      "Bash(git -C \"C:/workspace/jobseeker\" log --all --oneline)",
+      "Bash(go env *)",
+      "Bash(grep -r \"NetworkSetExtraHTTPHeaders\\\\|type Headers\" \"$\\(go env GOPATH\\)/pkg/mod/github.com/go-rod\")",
+      "Bash(grep -A5 \"type NetworkSetExtraHTTPHeaders\" \"$\\(go env GOPATH\\)/pkg/mod/github.com/go-rod/rod@v0.116.2/lib/proto/network.go\")",
+      "Bash(grep -n \"type NetworkHeaders\\\\|NetworkHeaders \" \"$\\(go env GOPATH\\)/pkg/mod/github.com/go-rod/rod@v0.116.2/lib/proto/network.go\")",
+      "Bash(grep -n \"SetExtraHeaders\\\\|ExtraHeaders\\\\|SetHeader\" \"$\\(go env GOPATH\\)/pkg/mod/github.com/go-rod/rod@v0.116.2/page.go\")"
     ],
     "deny": [],
     "ask": []

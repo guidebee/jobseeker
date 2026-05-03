@@ -374,6 +374,7 @@ func (p *Pool) FetchLinkedInHTML(profileURL string) (string, error) {
 	if err := page.SetUserAgent(&proto.NetworkSetUserAgentOverride{UserAgent: ua}); err != nil {
 		return "", fmt.Errorf("failed to set user agent: %w", err)
 	}
+	setClientHintHeaders(page)
 
 	// Clear all cookies for headless mode to simulate a fresh incognito session.
 	// Skipped for remote Chrome — clearing would wipe real browser sessions.
@@ -491,10 +492,10 @@ func (p *Pool) FetchLinkedInHTML(profileURL string) (string, error) {
 	return html, nil
 }
 
-// SearchAndFetchLinkedIn does a Google keyword search (site:linkedin.com/in KEYWORDS),
-// finds the first matching LinkedIn profile URL in the SERP, clicks it to generate
-// an authentic Referer, and returns the profile URL and rendered HTML.
-func (p *Pool) SearchAndFetchLinkedIn(keywords string) (profileURL, html string, err error) {
+// SearchAndFetchLinkedIn searches for a LinkedIn profile by keywords using the
+// given engine ("bing" or "google"), clicks the first matching result to
+// generate an authentic Referer, and returns the profile URL and rendered HTML.
+func (p *Pool) SearchAndFetchLinkedIn(keywords, searchEngine string) (profileURL, html string, err error) {
 	b := p.acquire()
 	defer p.release(b)
 
@@ -528,6 +529,7 @@ func (p *Pool) SearchAndFetchLinkedIn(keywords string) (profileURL, html string,
 	if err := page.SetUserAgent(&proto.NetworkSetUserAgentOverride{UserAgent: ua}); err != nil {
 		return "", "", fmt.Errorf("failed to set user agent: %w", err)
 	}
+	setClientHintHeaders(page)
 
 	if !p.remote {
 		if err := (proto.NetworkClearBrowserCookies{}).Call(page); err != nil {
@@ -537,16 +539,34 @@ func (p *Pool) SearchAndFetchLinkedIn(keywords string) (profileURL, html string,
 		}
 	}
 
-	// Step 1: Bing keyword search. No site: operator — both Google and Bing
-	// CAPTCHA headless browsers on operator queries. Appending "linkedin" steers
-	// results toward profile pages without triggering operator-based bot detection.
+	// Step 1: keyword search. No site: operator — both Google and Bing CAPTCHA
+	// headless browsers on operator queries. Appending "linkedin" steers results
+	// toward profile pages without triggering operator-based bot detection.
+	useGoogle := strings.EqualFold(searchEngine, "google")
 	query := keywords + " linkedin"
-	searchURL := "https://www.bing.com/search?q=" + url.QueryEscape(query) + "&setlang=en"
-	log.Printf("[browser] step 1: LinkedIn keyword search (Bing) — %s", searchURL)
+	var searchURL string
+	if useGoogle {
+		setGoogleConsentCookie(page)
+		warmUpGoogle(page)
+		searchURL = "https://www.google.com/search?q=" + url.QueryEscape(query) + "&hl=en"
+		log.Printf("[browser] step 1: LinkedIn keyword search (Google) — %s", searchURL)
+	} else {
+		searchURL = "https://www.bing.com/search?q=" + url.QueryEscape(query) + "&setlang=en"
+		log.Printf("[browser] step 1: LinkedIn keyword search (Bing) — %s", searchURL)
+	}
 
 	navigateWithStop(page, searchURL, 60*time.Second)
 	time.Sleep(2 * time.Second)
-	logPageTitle(page, "Google search")
+	logPageTitle(page, "search")
+
+	// Detect Google CAPTCHA (/sorry/index) immediately after navigation.
+	if useGoogle {
+		if info, err := page.Info(); err == nil && strings.Contains(info.URL, "/sorry/") {
+			return "", "", fmt.Errorf(
+				"Google blocked the search with a CAPTCHA (bot detection) — use --search-engine=bing or configure a residential proxy",
+			)
+		}
+	}
 
 	if r, err := page.Timeout(5 * time.Second).Eval(`() => document.body ? document.body.innerText.slice(0, 300) : "(no body)"`); err != nil {
 		log.Printf("[browser] body preview error: %v", err)
@@ -554,24 +574,39 @@ func (p *Pool) SearchAndFetchLinkedIn(keywords string) (profileURL, html string,
 		log.Printf("[browser] body preview: %s", r.Value.String())
 	}
 
-	// Step 2: extract the first LinkedIn profile URL from Bing SERP.
-	// Bing result links use opaque redirect hrefs (bing.com/ck/a?...) — the actual
-	// URL is only in <cite> text like "au.linkedin.com › in › guidebee".
-	r, evalErr := page.Timeout(10 * time.Second).Eval(`() => {
-		const cites = Array.from(document.querySelectorAll('cite'));
-		for (const cite of cites) {
-			const text = (cite.textContent || '').replace(/\s*[›>]\s*/g, '/').trim();
-			const m = text.match(/(?:https?:\/\/)?(?:[a-z]+\.)?linkedin\.com\/in\/([^/?#&\s]+)/i);
-			if (m && m[1]) return 'https://www.linkedin.com/in/' + m[1] + '/';
-		}
-		const links = Array.from(document.querySelectorAll('a[href]'));
-		for (const a of links) {
-			const href = a.href || '';
-			const m = href.match(/linkedin\.com\/in\/([^/?#&]+)/);
-			if (m && m[1]) return 'https://www.linkedin.com/in/' + m[1] + '/';
-		}
-		return '';
-	}`)
+	// Step 2: extract the first LinkedIn profile URL from the SERP.
+	// Bing result links use opaque redirect hrefs (bing.com/ck/a?...) — extract
+	// from <cite> text like "au.linkedin.com › in › guidebee".
+	// Google result links have the destination URL directly in href.
+	var extractJS string
+	if useGoogle {
+		extractJS = `() => {
+			const links = Array.from(document.querySelectorAll('a[href]'));
+			for (const a of links) {
+				const href = a.href || '';
+				const m = href.match(/linkedin\.com\/in\/([^/?#&]+)/);
+				if (m && m[1]) return 'https://www.linkedin.com/in/' + m[1] + '/';
+			}
+			return '';
+		}`
+	} else {
+		extractJS = `() => {
+			const cites = Array.from(document.querySelectorAll('cite'));
+			for (const cite of cites) {
+				const text = (cite.textContent || '').replace(/\s*[›>]\s*/g, '/').trim();
+				const m = text.match(/(?:https?:\/\/)?(?:[a-z]+\.)?linkedin\.com\/in\/([^/?#&\s]+)/i);
+				if (m && m[1]) return 'https://www.linkedin.com/in/' + m[1] + '/';
+			}
+			const links = Array.from(document.querySelectorAll('a[href]'));
+			for (const a of links) {
+				const href = a.href || '';
+				const m = href.match(/linkedin\.com\/in\/([^/?#&]+)/);
+				if (m && m[1]) return 'https://www.linkedin.com/in/' + m[1] + '/';
+			}
+			return '';
+		}`
+	}
+	r, evalErr := page.Timeout(10 * time.Second).Eval(extractJS)
 	if evalErr != nil {
 		return "", "", fmt.Errorf("failed to extract LinkedIn URL from SERP: %w", evalErr)
 	}
@@ -581,13 +616,16 @@ func (p *Pool) SearchAndFetchLinkedIn(keywords string) (profileURL, html string,
 	}
 	log.Printf("[browser] step 2: found profile URL: %s", foundURL)
 
-	// Step 3: click the first Bing result title link — it redirects through Bing
-	// to LinkedIn, so LinkedIn sees Referer: https://www.bing.com/ (trusted).
+	// Step 3: click the first result link — it navigates to LinkedIn with an
+	// authentic Referer from the search engine (trusted by LinkedIn).
+	var clickSelectors []string
+	if useGoogle {
+		clickSelectors = []string{`a[href*="linkedin.com/in/"]`, `div#search h3 a`}
+	} else {
+		clickSelectors = []string{`li.b_algo h2 a`, `a[href*="linkedin.com/in/"]`}
+	}
 	clicked := false
-	for _, sel := range []string{
-		`li.b_algo h2 a`,
-		`a[href*="linkedin.com/in/"]`,
-	} {
+	for _, sel := range clickSelectors {
 		el, elErr := page.Timeout(8 * time.Second).Element(sel)
 		if elErr != nil {
 			log.Printf("[browser] selector %q not found: %v", sel, elErr)
@@ -758,4 +796,27 @@ func setGoogleConsentCookie(page *rod.Page) {
 	} else {
 		log.Println("[browser] Google consent cookie set (SOCS=CAI)")
 	}
+}
+
+// setClientHintHeaders adds Chrome client-hint headers that headless Chrome
+// typically omits. Their absence is a detectable bot signal for Google.
+func setClientHintHeaders(page *rod.Page) {
+	_, err := page.SetExtraHeaders([]string{
+		"Accept-Language", "en-US,en;q=0.9",
+		"sec-ch-ua", `"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"`,
+		"sec-ch-ua-mobile", "?0",
+		"sec-ch-ua-platform", `"Windows"`,
+	})
+	if err != nil {
+		log.Printf("[browser] warning: could not set client-hint headers: %v", err)
+	}
+}
+
+// warmUpGoogle visits the Google home page briefly before a search to
+// establish a realistic browsing context. Jumping cold to a search URL is
+// a detectable headless-browser pattern.
+func warmUpGoogle(page *rod.Page) {
+	log.Println("[browser] warm-up: visiting google.com")
+	navigateWithStop(page, "https://www.google.com/", 20*time.Second)
+	time.Sleep(time.Duration(500+rand.Intn(1000)) * time.Millisecond)
 }
