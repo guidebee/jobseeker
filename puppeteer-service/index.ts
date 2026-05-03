@@ -371,7 +371,10 @@ async function fetchLinkedInDirect(profileURL: string): Promise<string> {
       if (!String(e).includes("timeout") && !String(e).includes("Timeout")) throw e;
     }
 
-    const title = await page.title();
+    // LinkedIn sometimes triggers a redirect after domcontentloaded, destroying
+    // the execution context. Wait briefly then re-read title/url.
+    await new Promise((r) => setTimeout(r, 1_500));
+    const title = await page.title().catch(() => "");
     const url = page.url();
     console.log(`[linkedin] title: "${title}"  url: ${url}`);
 
@@ -541,7 +544,7 @@ async function fetchLinkedInViaGoogle(profileURL: string): Promise<string> {
 // LinkedIn keyword search  (Google site:linkedin.com/in + keywords → HTML)
 // ---------------------------------------------------------------------------
 
-async function searchLinkedInProfileGoogle(keywords: string): Promise<{ profileURL: string; html: string }> {
+async function searchGoogleForLinkedInURL(keywords: string): Promise<string> {
   if (!SERPAPI_KEY) throw new Error("SERPAPI_KEY is not set in .env");
 
   const query = `${keywords} linkedin`;
@@ -555,31 +558,26 @@ async function searchLinkedInProfileGoogle(keywords: string): Promise<{ profileU
   });
 
   const results: any[] = response["organic_results"] ?? [];
-  let profileURL = "";
   for (const result of results) {
     const link: string = result["link"] ?? "";
     const m = link.match(/linkedin\.com\/in\/([^/?#&]+)/);
     if (m && m[1]) {
-      profileURL = `https://www.linkedin.com/in/${m[1]}/`;
-      break;
+      const profileURL = `https://www.linkedin.com/in/${m[1]}/`;
+      console.log(`[serpapi] found profile URL: ${profileURL}`);
+      return profileURL;
     }
   }
 
-  if (!profileURL) {
-    throw new Error(`No LinkedIn profile found via SerpAPI for keywords: ${keywords}`);
-  }
-  console.log(`[serpapi] found profile URL: ${profileURL}`);
+  throw new Error(`No LinkedIn profile found via SerpAPI for keywords: ${keywords}`);
+}
 
+async function searchLinkedInProfileGoogle(keywords: string): Promise<{ profileURL: string; html: string }> {
+  const profileURL = await searchGoogleForLinkedInURL(keywords);
   const html = await fetchLinkedInHTML(profileURL);
   return { profileURL, html };
 }
 
-async function searchLinkedInProfile(keywords: string, engine: string = "bing"): Promise<{ profileURL: string; html: string }> {
-  if (engine.toLowerCase() === "google") {
-    return searchLinkedInProfileGoogle(keywords);
-  }
-
-  // Bing path — Puppeteer-based (unchanged)
+async function searchBingForLinkedInURL(keywords: string): Promise<string> {
   const query = `${keywords} linkedin`;
   const searchURL = `https://www.bing.com/search?q=${encodeURIComponent(query)}&setlang=en`;
 
@@ -631,59 +629,26 @@ async function searchLinkedInProfile(keywords: string, engine: string = "bing"):
       throw new Error(`No LinkedIn profile found for keywords: ${keywords}`);
     }
     console.log(`[search] found profile URL: ${foundURL}`);
-
-    let clicked = false;
-    for (const sel of ["li.b_algo h2 a", "a[href*='linkedin.com/in/']"]) {
-      const el = await page.$(sel);
-      if (!el) continue;
-      const href = await el.evaluate((a) => a.getAttribute("href"));
-      console.log(`[search] clicking: ${(href ?? "").slice(0, 80)}`);
-      try {
-        await Promise.all([
-          page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 30_000 }),
-          el.click(),
-        ]);
-        clicked = true;
-        break;
-      } catch (e: any) {
-        console.log(`[search] click/nav error: ${e.message}`);
-      }
-    }
-
-    if (!clicked) {
-      console.log(`[search] no link clicked — navigating directly to ${foundURL}`);
-      try {
-        await page.goto(foundURL, { waitUntil: "domcontentloaded", timeout: 30_000 });
-      } catch (e: any) {
-        if (!String(e).includes("timeout") && !String(e).includes("Timeout")) throw e;
-      }
-    }
-
-    const liTitle = await page.title();
-    const liURL = page.url();
-    console.log(`[search] LinkedIn title: "${liTitle}"  url: ${liURL}`);
-
-    if (
-      liTitle.toLowerCase().includes("linkedin login") ||
-      liTitle.toLowerCase().includes("sign in") ||
-      liURL.includes("/login") ||
-      liURL.includes("/authwall")
-    ) {
-      throw new Error(
-        `LinkedIn redirected to login wall (title: "${liTitle}"). ` +
-        `Try again in a few minutes or configure a residential proxy.`
-      );
-    }
-
-    await new Promise((r) => setTimeout(r, 3_000));
-    const html = await page.content();
-    console.log(`[search] got ${html.length} bytes from ${liURL}`);
-    return { profileURL: liURL, html };
+    return foundURL;
 
   } finally {
     if (page) await page.close().catch(() => {});
     await pool.release(browser);
   }
+}
+
+async function searchLinkedInProfileBing(keywords: string): Promise<{ profileURL: string; html: string }> {
+  const profileURL = await searchBingForLinkedInURL(keywords);
+  // Hand off to fetchLinkedInHTML — same fresh-session + proxy path as the direct `linkedin` command.
+  const html = await fetchLinkedInHTML(profileURL);
+  return { profileURL, html };
+}
+
+async function searchLinkedInProfile(keywords: string, engine: string = "bing"): Promise<{ profileURL: string; html: string }> {
+  if (engine.toLowerCase() === "google") {
+    return searchLinkedInProfileGoogle(keywords);
+  }
+  return searchLinkedInProfileBing(keywords);
 }
 
 // ---------------------------------------------------------------------------
@@ -798,6 +763,38 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[api] /search-linkedin error: ${msg}`);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: msg }));
+    }
+    return;
+  }
+
+  // POST /search-url  — search only, returns profile URL without fetching LinkedIn HTML
+  if (url.pathname === "/search-url" && req.method === "POST") {
+    let body: { keywords?: string; engine?: string };
+    try {
+      body = JSON.parse(await readBody(req));
+    } catch {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "invalid JSON body" }));
+      return;
+    }
+    if (!body.keywords) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "missing field: keywords" }));
+      return;
+    }
+    const engine = (body.engine ?? "bing").toLowerCase();
+    console.log(`[api] /search-url keywords="${body.keywords}" engine="${engine}"`);
+    try {
+      const profileURL = engine === "google"
+        ? await searchGoogleForLinkedInURL(body.keywords)
+        : await searchBingForLinkedInURL(body.keywords);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ profileURL }));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[api] /search-url error: ${msg}`);
       res.writeHead(500, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: msg }));
     }

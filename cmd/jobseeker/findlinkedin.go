@@ -60,53 +60,56 @@ func runFindLinkedIn(cmd *cobra.Command, args []string) {
 		defer pool.Close()
 	}
 
-	// Phase 1: search to find the LinkedIn profile URL.
-	var profileURL, html string
-	const maxSearchRetries = 5
-	for attempt := 1; attempt <= maxSearchRetries; attempt++ {
+	// Phase 1: search once to discover the LinkedIn profile URL.
+	// The search itself (Bing/SerpAPI) is reliable — no need to retry it in a loop.
+	var profileURL string
+	if puppeteerClient != nil {
 		var err error
-		if puppeteerClient != nil {
-			profileURL, html, err = puppeteerClient.SearchLinkedIn(keywords, findLinkedInSearchEngine)
-		} else {
-			profileURL, html, err = pool.SearchAndFetchLinkedIn(keywords, findLinkedInSearchEngine)
-		}
+		profileURL, err = puppeteerClient.SearchLinkedInURL(keywords, findLinkedInSearchEngine)
 		if err != nil {
-			if attempt < maxSearchRetries {
-				log.Printf("Search attempt %d failed: %v — retrying in 5s...", attempt, err)
-				time.Sleep(5 * time.Second)
-				continue
-			}
+			log.Fatalf("Failed to find LinkedIn profile URL: %v", err)
+		}
+	} else {
+		var html string
+		var err error
+		profileURL, html, err = pool.SearchAndFetchLinkedIn(keywords, findLinkedInSearchEngine)
+		if err != nil {
 			log.Fatalf("Failed to find profile: %v", err)
 		}
-		break
+		_ = html
 	}
 
 	fmt.Printf("Found profile: %s\n\n", profileURL)
 
-	// Phase 2: parse the HTML, retrying with a fresh fetch on non-English pages.
-	// A non-English page means the proxy/IP landed on a non-English region;
-	// re-fetching picks a fresh session which may land on an English region.
-	const maxParseRetries = 5
+	// Phase 2: fetch and parse the profile HTML, retrying on block or non-English page.
+	// Uses FetchLinkedIn (same path as `linkedin` command) — fresh session each attempt.
+	const maxRetries = 5
 	var profile *linkedinpkg.Profile
-	for attempt := 1; attempt <= maxParseRetries; attempt++ {
+	var html string
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		var fetchErr error
+		if puppeteerClient != nil {
+			html, fetchErr = puppeteerClient.FetchLinkedIn(profileURL)
+		} else {
+			html, fetchErr = pool.FetchLinkedInHTML(profileURL)
+		}
+		if fetchErr != nil {
+			if attempt < maxRetries {
+				log.Printf("Fetch attempt %d/%d failed: %v — retrying in 20s...", attempt, maxRetries, fetchErr)
+				time.Sleep(20 * time.Second)
+				continue
+			}
+			log.Fatalf("Failed to fetch profile: %v", fetchErr)
+		}
 		var parseErr error
 		profile, parseErr = linkedinpkg.ParseHTML(html, profileURL)
 		if parseErr == nil {
 			break
 		}
 		retryable := errors.Is(parseErr, linkedinpkg.ErrNonEnglishPage) || errors.Is(parseErr, linkedinpkg.ErrBlocked)
-		if retryable && attempt < maxParseRetries {
-			log.Printf("Attempt %d/%d: %v — re-fetching %s in 5s...", attempt, maxParseRetries, parseErr, profileURL)
-			time.Sleep(5 * time.Second)
-			var fetchErr error
-			if puppeteerClient != nil {
-				html, fetchErr = puppeteerClient.FetchLinkedIn(profileURL)
-			} else {
-				html, fetchErr = pool.FetchLinkedInHTML(profileURL)
-			}
-			if fetchErr != nil {
-				log.Printf("Re-fetch attempt %d failed: %v — retrying...", attempt, fetchErr)
-			}
+		if retryable && attempt < maxRetries {
+			log.Printf("Attempt %d/%d: %v — retrying in 20s...", attempt, maxRetries, parseErr)
+			time.Sleep(20 * time.Second)
 			continue
 		}
 		log.Fatalf("Failed to parse profile: %v", parseErr)
