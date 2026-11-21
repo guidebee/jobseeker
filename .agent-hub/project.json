@@ -1,0 +1,11 @@
+{
+  "name": "jobseeker",
+  "home": "C:/workspace/agent-hub-projects/jobseeker",
+  "branch": "main",
+  "policy_file": "AGENTS.md",
+  "assignment_check": "warn",
+  "greeting_refs": [
+    "AGENTS.md",
+    "README.md"
+  ]
+}
