@@ -12,7 +12,7 @@ the project is a pilot: it is built so that other people can use it later.
 
 | Role | Does | Does not |
 |---|---|---|
-| `job-hunter` | Runs the weekly pipeline for the person named in the task, reads the result, reports counts, failures and fit | Edit this repository, apply for a job, contact anyone, read another person's folder |
+| `job-hunter` | Runs the weekly pipeline for the person named in the task, reads the result, reports counts, failures and fit | Edit this repository, apply for a job, contact anyone, write tailored CVs or cover letters, check recruiter job descriptions, read another person's folder |
 | `reviewer` | Checks the facts of a job-hunter report (counts, scores, links) and of any change here | Approve its own work |
 | Owner | Assigns the weekly task, merges changes, decides anything about people, accounts or credentials | |
 
@@ -35,6 +35,8 @@ A developer changes this repository only on a branch, through a pull request the
 - Dry run first. Sending is off unless the owner's scheduler turns it on; a listing is marked as sent only after it was sent.
 - If the site blocks the scan, report it and skip. Do not work around a block, and respect each site's terms and robots.txt.
 - The pipeline needs `MINIMAX_API_KEY` in the person's `.env`. Check that it is set, never print or copy it.
+- The agent's work is search, analyse, report. The commands `checkjd`, `tailorcv` and cover letters are not part of it and need no
+  Anthropic API key (`CLAUDE_API_KEY`); the owner may still run them by hand.
 
 ## Changing this repository
 
