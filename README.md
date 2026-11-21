@@ -2085,83 +2085,81 @@ jobseeker export --all-statuses --output my_jobs.xlsx  # Export all jobs
 
 ## Automated Pipeline (Cron Job)
 
-`run_jobseeker.sh` is a ready-to-use shell script that runs the full pipeline unattended:
+`run_jobseeker.sh` runs the full pipeline unattended **for one person**:
 
 ```
-scan → analyze → query new recommended jobs → (optionally) email results → mark as emailed
+scan -> analyze -> query new recommended jobs -> (optionally) email them -> mark them as sent
 ```
 
-### Quick Start
+### One folder per person
 
-```bash
-# Make executable
-chmod +x run_jobseeker.sh
+The code and the data are separate. The repository holds the code and the binary and never personal data; each person has
+their own data folder, and the script runs from it:
 
-# Test a dry run (SEND_EMAIL=false by default — just prints results)
-./run_jobseeker.sh
+```
+JOBSEEKER_HOME=/data/alice ./run_jobseeker.sh
 ```
 
-### Configuration
+The data folder must contain `.env` (needs `USER_EMAIL` and `MINIMAX_API_KEY`), `configs/config.yaml` (copy
+`configs/config.example.yaml`) and optionally `resumes/`. The script creates `jobseeker.db` there. Never share one folder between
+people. Without `JOBSEEKER_HOME` it uses the repository folder, which is the old single-user layout.
 
-All settings are controlled via environment variables (set in `.env` or inline):
+### Dry run by default
+
+`SEND_EMAIL` defaults to `false`: the script prints the shortlist and **changes nothing**, so the same jobs show again on the next
+run. Only `SEND_EMAIL=true` emails the shortlist, and the jobs are marked as sent only **after the email was sent**. If sending
+fails, nothing is marked and the next run tries again.
+
+### Settings
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `SEND_EMAIL` | `false` | Set to `true` to send HTML email after scan |
-| `EMAIL_SCRIPT` | `/path/to/send_email.js` | Path to Node.js email sender (required if `SEND_EMAIL=true`) |
-| `TO` | `your.email@example.com` | Recipient email address |
+| `JOBSEEKER_HOME` | the repository folder | The person's data folder |
+| `JOBSEEKER_BIN` | `<repository>/jobseeker.exe` | The binary to run |
+| `SEND_EMAIL` | `false` | `true` to email the shortlist and mark those jobs as sent |
+| `EMAIL_SCRIPT` | none | Path of the Node.js email sender (required when `SEND_EMAIL=true`) |
+| `TO` | none | Recipient address (required when `SEND_EMAIL=true`; placeholder addresses are refused) |
 | `SUBJECT` | `Jobseeker: Recommended Jobs Update` | Email subject line |
-| `MIN_SCORE` | `70` | Minimum match score to include in results/email |
+| `MIN_SCORE` | `70` | Minimum match score, a whole number |
 
-### Schedule with Cron
+The script checks everything first and stops with a clear message if something is missing: the data folder, the binary, `.env`,
+`USER_EMAIL`, `MINIMAX_API_KEY`, `configs/config.yaml`, Python 3 with sqlite3, and (when sending) Node.js, `EMAIL_SCRIPT` and `TO`.
+`CLAUDE_API_KEY` is only needed for `checkjd` and `tailorcv`, not for this script.
+
+### Schedule with cron
 
 ```bash
-# Open crontab editor
-crontab -e
-
-# Run every weekday at 8 AM, log output
-0 8 * * 1-5 /home/youruser/workspace/jobseeker/run_jobseeker.sh >> /tmp/jobseeker.log 2>&1
-
-# Run twice daily (8 AM and 6 PM) on weekdays
-0 8,18 * * 1-5 /home/youruser/workspace/jobseeker/run_jobseeker.sh >> /tmp/jobseeker.log 2>&1
-
-# Run once daily at 7 AM every day
-0 7 * * * /home/youruser/workspace/jobseeker/run_jobseeker.sh >> /tmp/jobseeker.log 2>&1
+# Every Monday at 8 AM, for one person, logging the output
+0 8 * * 1 JOBSEEKER_HOME=/data/alice SEND_EMAIL=true EMAIL_SCRIPT=/opt/send_email.js TO=alice@yourdomain.test /path/to/jobseeker/run_jobseeker.sh >> /tmp/jobseeker-alice.log 2>&1
 ```
 
-### What the Script Does
+On Windows use the Task Scheduler to run the same command through Git Bash.
 
-1. **Loads `.env`** — API keys and user configuration
-2. **Scans job boards** — `jobseeker.exe scan` (SEEK, LinkedIn, Indeed)
-3. **Runs AI analysis** — `jobseeker.exe analyze` (MiniMax, unanalyzed jobs only)
-4. **Queries new recommendations** — jobs with `match_score >= MIN_SCORE` and `emailed_at IS NULL`
-5. **Prints summary** — top matches printed to stdout / log file regardless of email setting
-6. **Sends HTML email** *(optional)* — colour-coded email with match scores, pros/cons, and job links
-7. **Marks as emailed** — sets `emailed_at` timestamp so jobs aren't re-sent next run
+### What the script does
 
-### Email Output Preview
+1. **Checks** the settings (above) before touching any data.
+2. **Scans** the job boards: `jobseeker.exe scan` with that person's config and database.
+3. **Analyzes** new listings: `jobseeker.exe analyze` (MiniMax).
+4. **Queries** jobs with `match_score >= MIN_SCORE` that have not been sent.
+5. **Prints** the top matches (always).
+6. **Emails** an HTML digest (only with `SEND_EMAIL=true`). Every scraped value is HTML-escaped and only `http(s)` links are kept.
+7. **Marks** the jobs as sent, only after the email succeeded.
 
-When `SEND_EMAIL=true`, the script sends a styled HTML email:
-- Green border → score ≥ 85
-- Yellow border → score 70–84
-- Each job shows: title (linked), company, location, salary, match badge, AI analysis, pros/cons
+### Tests
+
+```bash
+bash tests/run_jobseeker_test.sh
+```
+
+Uses a fake binary, a fake email sender and a throwaway database: dry runs mark nothing, a failed send marks nothing, hostile job
+text is escaped, each person's data folder is separate, and bad settings are refused.
 
 ### Prerequisites
 
 ```bash
-# 1. Build the binary
-go build -o jobseeker.exe ./cmd/jobseeker
-
-# 2. Initialise your profile (run once)
-./jobseeker.exe init
-
-# 3. Verify .env has required keys
-#    USER_EMAIL, MINIMAX_API_KEY (for analyze)
-#    CLAUDE_API_KEY (only needed for checkjd / tailorcv)
+go build -o jobseeker.exe ./cmd/jobseeker     # build the binary once
+cd /data/alice && /path/to/jobseeker/jobseeker.exe --config configs/config.yaml --database jobseeker.db init   # once per person, from their folder
 ```
-
-> **Note:** `SEND_EMAIL=false` (the default) skips the email step entirely and just prints
-> results to stdout — useful for testing or when you prefer to review via `jobseeker list`.
 
 ---
 
