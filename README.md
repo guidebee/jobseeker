@@ -3,7 +3,7 @@
 An intelligent job search automation tool that discovers jobs, analyzes matches using AI, and helps you apply to the best opportunities.
 
 > **AI Architecture (Cost-Optimised):**
-> - **MiniMax** (`MiniMax-M1` or `MiniMax-M2.5`) — bulk job analysis (`analyze` command). Fast and cost-effective for processing hundreds of jobs at scale.
+> - **MiniMax** (`MiniMax-M1`; the M2.x models have been retired by MiniMax) — bulk job analysis (`analyze` command). Fast and cost-effective for processing hundreds of jobs at scale.
 > - **Claude** (`claude-sonnet-4-5`) — document processing only: recruiter JD analysis (`checkjd`), tailored CV generation (`tailorcv`), and cover letter writing. Used selectively where document quality matters most.
 
 ![jobseeker](./images/jobseeker.png)
@@ -1728,7 +1728,7 @@ USER_EMAIL=your.email@example.com
 # MiniMax API (used for bulk job analysis - analyze command)
 # Sign up at: https://www.minimaxi.com/
 MINIMAX_API_KEY=your_minimax_api_key_here
-MINIMAX_MODEL=MiniMax-M2.5   # or MiniMax-M1 (default)
+MINIMAX_MODEL=MiniMax-M1     # the default; M2.x models are retired (API error 2069)
 
 # Claude API (used for document processing: checkjd, tailorcv, cover letters)
 # Sign up at: https://console.anthropic.com/
@@ -2002,7 +2002,7 @@ Error: failed to get MiniMax response
 ```
 → Verify MINIMAX_API_KEY in .env
 → Check key validity at minimaxi.com
-→ Try MINIMAX_MODEL=MiniMax-M1 if M2.5 is unavailable
+→ API error 2069 "model is no longer available": set MINIMAX_MODEL to a model MiniMax still serves (MiniMax-M1 works)
 
 ## Quick Reference Card
 
