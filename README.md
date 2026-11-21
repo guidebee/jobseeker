@@ -2104,6 +2104,18 @@ The data folder must contain `.env` (needs `USER_EMAIL` and `MINIMAX_API_KEY`), 
 `configs/config.example.yaml`) and optionally `resumes/`. The script creates `jobseeker.db` there. Never share one folder between
 people. Without `JOBSEEKER_HOME` it uses the repository folder, which is the old single-user layout.
 
+### One-time setup for a new person
+
+Before the first run, create the person's profile once, from their folder (this reads `resumes/` and `configs/config.yaml` and
+writes the database; it is not part of the weekly script on purpose, because it rewrites the cached profile):
+
+```
+cd /data/alice && /path/to/jobseeker/jobseeker.exe --config configs/config.yaml --database jobseeker.db init
+```
+
+Without it the weekly run stops at the scan with "Failed to get current user ... Run 'jobseeker init' first". Run it again after
+changing the resumes or the profile. SQL statements are no longer logged; set `JOBSEEKER_DEBUG=1` to see them.
+
 ### Dry run by default
 
 `SEND_EMAIL` defaults to `false`: the script prints the shortlist and **changes nothing**, so the same jobs show again on the next

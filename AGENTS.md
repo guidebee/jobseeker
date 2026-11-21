@@ -33,6 +33,7 @@ A developer changes this repository only on a branch, through a pull request the
 - The only command a job-hunter runs is `bash C:/workspace/jobseeker-tools/run_weekly.sh <person>`. It takes exactly one argument,
   refuses anything else, and writes the full output to the person's `runs/` folder.
 - Dry run first. Sending is off unless the owner's scheduler turns it on; a listing is marked as sent only after it was sent.
+- A new person needs `jobseeker init` run once by the owner before the first run; the job-hunter does not run it. If the run stops with "Run 'jobseeker init' first", report that and stop.
 - If the site blocks the scan, report it and skip. Do not work around a block, and respect each site's terms and robots.txt.
 - The pipeline needs `MINIMAX_API_KEY` in the person's `.env`. Check that it is set, never print or copy it.
 - The agent's work is search, analyse, report. The commands `checkjd`, `tailorcv` and cover letters are not part of it and need no
