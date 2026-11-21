@@ -33,6 +33,9 @@ A developer changes this repository only on a branch, through a pull request the
 
 - The only command a job-hunter runs is `bash C:/workspace/jobseeker-tools/run_weekly.sh <person>`. It takes exactly one argument,
   refuses anything else, and writes the full output to the person's `runs/` folder.
+- **A run takes 30 to 60 minutes. Start it once.** If your tool call times out or you are unsure whether it is still going, do **not** run
+  it again: look in `runs/` for a log that is still growing and for `runs/.lock`, and wait. The wrapper refuses a second start with exit code 3
+  and "already active"; if you see that, stop and report it. Two runs at once score the same listings twice and double the cost.
 - Dry run first. Sending is off unless the owner's scheduler turns it on; a listing is marked as sent only after it was sent.
 - A new person needs `jobseeker init` run once by the owner before the first run; the job-hunter does not run it. If the run stops with "Run 'jobseeker init' first", report that and stop.
 - If the site blocks the scan, report it and skip. Do not work around a block, and respect each site's terms and robots.txt.
