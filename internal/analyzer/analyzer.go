@@ -246,15 +246,15 @@ func (a *Analyzer) parseAnalysisResponse(response string) (*AnalysisResult, erro
 		cleaned = strings.TrimSpace(cleaned[idx+len("</think>"):])
 	}
 
-	// Strip optional markdown code fences
-	cleaned = strings.TrimPrefix(cleaned, "```json")
-	cleaned = strings.TrimPrefix(cleaned, "```")
-	cleaned = strings.TrimSuffix(cleaned, "```")
-	cleaned = strings.TrimSpace(cleaned)
+	// The model may wrap the JSON in a markdown fence, add a sentence before it, or a note after it ("invalid character '`'
+	// after top-level value"). Decode the first complete JSON object and ignore whatever surrounds it.
+	start := strings.Index(cleaned, "{")
+	if start == -1 {
+		return nil, fmt.Errorf("failed to parse JSON: no JSON object in the answer")
+	}
 
 	var result AnalysisResult
-	err := json.Unmarshal([]byte(cleaned), &result)
-	if err != nil {
+	if err := json.NewDecoder(strings.NewReader(cleaned[start:])).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 

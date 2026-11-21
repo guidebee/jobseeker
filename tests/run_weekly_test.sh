@@ -26,6 +26,8 @@ cp "$REPO/run_jobseeker.sh" "$CODE/run_jobseeker.sh"
 cat > "$CODE/jobseeker.exe" <<'E'
 #!/bin/bash
 echo "$@" >> "$FAKE_LOG"
+[ -n "${FAKE_SLEEP:-}" ] && sleep "$FAKE_SLEEP"
+exit 0
 E
 chmod +x "$CODE/jobseeker.exe"
 
@@ -103,6 +105,40 @@ check "the digest holds the listing" "$(grep -c 'SECRET-TITLE-alice' "$DATA"/ali
 check "the receipt still shows no job title" "$(printf '%s' "$OUT" | grep -c 'SECRET-TITLE')" "0"
 check "the receipt still shows no link" "$(printf '%s' "$OUT" | grep -c 'secret-link')" "0"
 check "alice's listing is marked as sent" "$(sent_count alice)" "1"
+
+echo "one run at a time"
+L="$DATA/alice/runs/.lock"
+rm -rf "$L"
+LOGS_BEFORE="$(ls "$DATA/alice/runs"/*.log 2>/dev/null | wc -l | tr -d ' ')"
+( env JOBSEEKER_DATA_ROOT="$DATA" JOBSEEKER_CODE="$CODE" JOBSEEKER_TOOLS="$ROOT/tools" FAKE_LOG="$ROOT/calls.log" FAKE_SLEEP=2 bash "$WRAPPER" alice > "$ROOT/first.out" 2>&1; echo $? > "$ROOT/first.rc" ) &
+FIRST=$!
+sleep 1.5
+check "the lock exists while a run is active" "$([ -d "$L" ] && echo yes || echo no)" "yes"
+runm alice
+check "a second start is refused with exit code 3" "$RC" "3"
+case "$OUT" in *"already active"*"Nothing was started"*) ok "and says a run is already active" ;; *) bad "refusal message: $OUT" ;; esac
+check "the refused start made no log file of its own" "$(ls "$DATA/alice/runs"/*.log 2>/dev/null | wc -l | tr -d ' ')" "$((LOGS_BEFORE + 1))"
+check "and did not remove the running run's lock" "$([ -d "$L" ] && echo yes || echo no)" "yes"
+check "another person is not blocked" "$([ -d "$DATA/bob/runs/.lock" ] && echo locked || echo free)" "free"
+wait "$FIRST"
+check "the first run still finished normally" "$(cat "$ROOT/first.rc")" "0"
+check "the lock is released when a run ends" "$([ -e "$L" ] && echo yes || echo no)" "no"
+runm alice
+check "so the next run starts" "$RC" "0"
+
+echo "a lock left by a crash is taken over"
+mkdir -p "$L"; echo 999999 > "$L/pid"; echo "2026-11-21 00:00:00" > "$L/started"
+runm alice
+check "a lock whose process is gone is taken over" "$RC" "0"
+check "and released afterwards" "$([ -e "$L" ] && echo yes || echo no)" "no"
+mkdir -p "$L"; echo $$ > "$L/pid"; touch -d "5 hours ago" "$L"
+runm alice
+check "a lock older than four hours is taken over even if its process id is alive" "$RC" "0"
+mv "$DATA/alice/.env" "$DATA/alice/.env.off"
+runm alice
+check "a failing run exits non-zero" "$([ "$RC" -ne 0 ] && echo fail || echo ran)" "fail"
+check "and still releases the lock" "$([ -e "$L" ] && echo yes || echo no)" "no"
+mv "$DATA/alice/.env.off" "$DATA/alice/.env"
 
 echo
 echo "$PASS passed, $FAILS failed"

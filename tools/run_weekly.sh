@@ -43,6 +43,24 @@ mkdir -p "$HOME_DIR/runs"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 LOG="$HOME_DIR/runs/${STAMP}.log"
 
+# One run at a time per person. A run takes tens of minutes; a second start would score the same listings twice (double cost) and
+# fight over the database. The lock is a folder holding the owner's process id and start time. It is released when this script
+# ends, and a lock whose process is gone, or that is older than four hours, is taken over.
+LOCK="$HOME_DIR/runs/.lock"
+if ! mkdir "$LOCK" 2>/dev/null; then
+  OWNER_PID="$(cat "$LOCK/pid" 2>/dev/null || true)"
+  if { [ -n "$OWNER_PID" ] && ! kill -0 "$OWNER_PID" 2>/dev/null; } || [ -n "$(find "$LOCK" -maxdepth 0 -mmin +240 2>/dev/null)" ]; then
+    rm -rf "$LOCK"
+    mkdir "$LOCK" 2>/dev/null || fail "could not take the run lock for '${PERSON}'"
+  else
+    echo "[run_weekly] a run for '${PERSON}' is already active (started $(cat "$LOCK/started" 2>/dev/null || echo unknown)). Do not start another: wait for it, then read its log in the runs folder. Nothing was started." >&2
+    exit 3
+  fi
+fi
+echo "$$" > "$LOCK/pid"
+date '+%Y-%m-%d %H:%M:%S' > "$LOCK/started"
+trap 'rm -rf "$LOCK"' EXIT
+
 DELIVERY=none
 [ -f "$TOOLS/delivery/${PERSON}.on" ] && DELIVERY=digest
 
