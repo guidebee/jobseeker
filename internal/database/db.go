@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
@@ -19,7 +20,7 @@ func InitDB(dbPath string) error {
 	// Open SQLite database
 	// gorm.Config lets you customize logging and behavior
 	DB, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(sqlLogLevel()),
 	})
 
 	if err != nil {
@@ -42,4 +43,13 @@ func InitDB(dbPath string) error {
 // Useful for testing - you can mock this
 func GetDB() *gorm.DB {
 	return DB
+}
+
+// sqlLogLevel keeps the SQL out of the output (the unattended weekly run filled its log with schema statements) unless
+// JOBSEEKER_DEBUG is set to a non-empty value.
+func sqlLogLevel() logger.LogLevel {
+	if os.Getenv("JOBSEEKER_DEBUG") != "" {
+		return logger.Info
+	}
+	return logger.Warn
 }
