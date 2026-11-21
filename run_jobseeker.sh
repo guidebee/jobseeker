@@ -15,6 +15,9 @@
 # Settings (environment variables):
 #   SEND_EMAIL   true to email the shortlist and mark those jobs as sent. Default false: a dry run that prints the
 #                shortlist and changes nothing, so the same jobs show up on the next run.
+#   DELIVERY     digest: write the shortlist as runs/digest-<stamp>.md in the person's folder, then mark those jobs as sent.
+#                Someone (the Agent Hub job-hunter) relays the digest. The wrapper tools/run_weekly.sh sets it only when the
+#                owner has switched delivery on for that person. Default: none (the dry run above).
 #   EMAIL_SCRIPT path of the Node.js sender (required when SEND_EMAIL=true), TO the recipient, SUBJECT the subject.
 #   MIN_SCORE    minimum match score to include (whole number, default 70).
 #   JOBSEEKER_BIN  the binary to run (default: $JOBSEEKER_DIR/jobseeker.exe).
@@ -75,6 +78,20 @@ log "Starting pipeline at $(date '+%Y-%m-%d %H:%M:%S') for ${USER_EMAIL}"
 log "Data folder: ${JOBSEEKER_HOME}   Send email: ${SEND_EMAIL}"
 log "============================================"
 
+mark_sent() {
+  log "Marking ${COUNT} job(s) as sent..."
+  "$PYTHON" - "$ROWS" "$DB_PATH" <<'PYEOF'
+import datetime, json, sqlite3, sys
+ids = [r[0] for r in json.load(open(sys.argv[1], encoding="utf-8"))]
+now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+conn = sqlite3.connect(sys.argv[2])
+conn.executemany("UPDATE jobs SET emailed_at = ? WHERE id = ?", [(now, i) for i in ids])
+conn.commit()
+conn.close()
+print("Marked %d job(s) as sent at %s." % (len(ids), now))
+PYEOF
+}
+
 run() { "$JOBSEEKER_BIN" --config "$JOBSEEKER_HOME/configs/config.yaml" --database "$DB_PATH" "$@"; }
 
 # ─── Step 1: Scan job boards ──────────────────────────────────────────────────
@@ -95,7 +112,7 @@ import json, sqlite3, sys
 db, min_score, out = sys.argv[1], int(sys.argv[2]), sys.argv[3]
 conn = sqlite3.connect(db)
 rows = conn.execute(
-    """SELECT id, title, company, location, salary, url, match_score, analysis_pros, analysis_cons, analysis
+    """SELECT id, title, company, location, salary, url, match_score, analysis_pros, analysis_cons, analysis, source, job_type
        FROM jobs
        WHERE is_analyzed = 1 AND match_score >= ? AND deleted_at IS NULL AND emailed_at IS NULL
        ORDER BY match_score DESC""",
@@ -118,12 +135,64 @@ fi
 import json, sys
 rows = json.load(open(sys.argv[1], encoding="utf-8"))
 print("\nTop recommended jobs:")
-for _id, title, company, location, salary, url, score, pros, cons, analysis in rows[:10]:
+for _id, title, company, location, salary, url, score, pros, cons, analysis, source, job_type in rows[:10]:
     sal = " | %s" % salary if salary else ""
     print("  [%s/100] %s @ %s (%s%s)" % (score, title, company, location, sal))
     print("          %s" % url)
 print()
 PYEOF
+
+# ─── Digest delivery: write the digest file, then mark as sent; the job-hunter relays the file ───
+if [ "${DELIVERY:-none}" = "digest" ]; then
+  mkdir -p "$JOBSEEKER_HOME/runs"
+  DIGEST_NAME="digest-${JOBSEEKER_RUN_STAMP:-$(date +%Y%m%d-%H%M%S)}.md"
+  "$PYTHON" - "$ROWS" "$JOBSEEKER_HOME/runs/$DIGEST_NAME" <<'PYEOF'
+import json, re, sys
+rows = json.load(open(sys.argv[1], encoding="utf-8"))
+
+
+def md(value):
+    """Plain text made safe for Markdown: scraped text must not become formatting, links or HTML."""
+    text = re.sub(r"\s+", " ", "" if value is None else str(value)).strip()
+    return re.sub(r"([\\`*_{}\[\]()<>#+!|~])", r"\\\1", text)
+
+
+def points(raw):
+    try:
+        data = json.loads(raw) if raw else []
+    except ValueError:
+        data = [raw]
+    if isinstance(data, str):
+        data = [data]
+    return [str(x).strip() for x in data if str(x).strip()] if isinstance(data, list) else []
+
+
+def link(url):
+    url = "" if url is None else str(url)
+    return url.replace("(", "%28").replace(")", "%29").replace(" ", "%20") if url.startswith(("https://", "http://")) else ""
+
+
+out = ["# Jobseeker: %d new match%s\n" % (len(rows), "" if len(rows) == 1 else "es"),
+       "Listings that scored well against the resume and were not sent before, strongest first. Public job adverts only.\n"]
+for _id, title, company, location, salary, url, score, pros, cons, analysis, source, job_type in rows:
+    out.append("## %s (%s/100)\n" % (md(title) or "Untitled", score))
+    facts = [md(x) for x in (company, location, salary, source, job_type) if x]
+    if facts:
+        out.append(" · ".join(facts) + "\n")
+    if link(url):
+        out.append("[Open the advert](%s)\n" % link(url))
+    for point in points(pros)[:4]:
+        out.append("- Pro: " + md(point))
+    for point in points(cons)[:4]:
+        out.append("- Con: " + md(point))
+    out.append("")
+open(sys.argv[2], "w", encoding="utf-8").write("\n".join(out))
+PYEOF
+  log "Digest written: runs/${DIGEST_NAME} (${COUNT} listing(s))"
+  mark_sent
+  log "Pipeline finished at $(date '+%Y-%m-%d %H:%M:%S')"
+  exit 0
+fi
 
 if [ "$SEND_EMAIL" != "true" ]; then
   log "SEND_EMAIL is not true: dry run. Nothing was sent and nothing was marked, so these jobs will appear again."
@@ -161,7 +230,7 @@ a { color: #007bff; }
 <h1>Jobseeker Recommended Jobs</h1>
 <p>Found <strong>%d</strong> new recommended jobs matching your profile.</p>
 """ % len(rows)]
-for _id, title, company, location, salary, url, score, pros, cons, analysis in rows:
+for _id, title, company, location, salary, url, score, pros, cons, analysis, source, job_type in rows:
     strong = score >= 85
     sal = " &middot; %s" % esc(salary) if salary else ""
     out.append("""
@@ -182,17 +251,7 @@ log "Sending email to ${TO}..."
 node "$EMAIL_SCRIPT" --to "$TO" --subject "$SUBJECT" --html --body-file "$HTML_FILE"
 log "Email sent."
 
-log "Marking ${COUNT} job(s) as sent..."
-"$PYTHON" - "$ROWS" "$DB_PATH" <<'PYEOF'
-import datetime, json, sqlite3, sys
-ids = [r[0] for r in json.load(open(sys.argv[1], encoding="utf-8"))]
-now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-conn = sqlite3.connect(sys.argv[2])
-conn.executemany("UPDATE jobs SET emailed_at = ? WHERE id = ?", [(now, i) for i in ids])
-conn.commit()
-conn.close()
-print("Marked %d job(s) as sent at %s." % (len(ids), now))
-PYEOF
+mark_sent
 
 log "============================================"
 log "Pipeline done! ${COUNT} job(s) sent."

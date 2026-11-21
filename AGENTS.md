@@ -26,7 +26,8 @@ A developer changes this repository only on a branch, through a pull request the
   `.gitignore` covers the usual names; do not rely on it alone.
 - **Private in every post, report, commit and log:** the resume, contact details, saved searches, listing history, the database and
   credentials. Say "the resume", not what is in it. The shortlist (titles, scores, reasons, links) stays in the person's folder
-  and travels only by the route the owner approved. The task thread gets counts, failures and a receipt (file name, run time).
+  and travels only by the route the owner approved. For the pilot that route is the weekly digest (`runs/digest-<time>.md`): the
+  shortlist is public job adverts, and the job-hunter posts the digest to the owner only when the weekly task says so in writing. The task thread gets counts, failures and a receipt (file name, run time).
 
 ## Running the pipeline
 
