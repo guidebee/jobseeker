@@ -541,6 +541,17 @@ Found 15 jobs to analyze
 
 ---
 
+**Rescoring and skipped listings**
+
+- `jobseeker analyze --rescore` scores every listing again, including those already analysed. Use it after changing a resume, the model or
+  the prompt (the scores of the earlier version are replaced).
+- A listing with no usable description (under 200 characters, for example when a board rate-limited the description fetch) is **skipped**,
+  not scored: a score for a title alone is a guess. It stays unanalysed and is scored on a later run once its description exists. With
+  `--rescore`, such a listing's old score is cleared.
+- The resume sent to the model is its plain text (up to 12,000 characters), not the document's XML.
+
+---
+
 ### `jobseeker list` - View Jobs
 
 Display jobs from database with filtering options.

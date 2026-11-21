@@ -2,8 +2,10 @@ package resume
 
 import (
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/nguyenthenguyen/docx"
@@ -73,7 +75,33 @@ func parseDocx(filePath string) (string, error) {
 	defer r.Close()
 
 	docx1 := r.Editable()
-	return docx1.GetContent(), nil
+	// GetContent returns the raw WordprocessingML (document.xml), not text. Sent as it was, a resume reached the model as
+	// markup: with the prompt cutting it to its first 2,000 characters, the model saw tags and almost no words.
+	return docxText(docx1.GetContent()), nil
+}
+
+var (
+	docxFieldCode  = regexp.MustCompile(`(?s)<w:instrText[^>]*>.*?</w:instrText>`)
+	docxLineBreak  = regexp.MustCompile(`</w:p>|<w:br[^>]*/>|<w:cr\s*/>`)
+	docxTabStop    = regexp.MustCompile(`<w:tab\s*/>|</w:tc>`)
+	docxAnyTag     = regexp.MustCompile(`<[^>]+>`)
+	docxSpaceRuns  = regexp.MustCompile(`[ \t]+`)
+	docxBlankLines = regexp.MustCompile(`\n{3,}`)
+)
+
+// docxText turns the WordprocessingML of a document into plain text: one line per paragraph, a tab between table cells and
+// at tab stops, field codes (such as a hyperlink's instruction) dropped, XML entities decoded.
+func docxText(xml string) string {
+	text := docxFieldCode.ReplaceAllString(xml, "")
+	text = docxLineBreak.ReplaceAllString(text, "\n")
+	text = docxTabStop.ReplaceAllString(text, "\t")
+	text = docxAnyTag.ReplaceAllString(text, "")
+	text = html.UnescapeString(text)
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimSpace(docxSpaceRuns.ReplaceAllString(line, " "))
+	}
+	return strings.TrimSpace(docxBlankLines.ReplaceAllString(strings.Join(lines, "\n"), "\n\n"))
 }
 
 // SelectBestResume chooses the most appropriate resume for a job
