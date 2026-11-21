@@ -18,6 +18,11 @@
 #     <tools folder>/delivery/<person>.on . With the marker the run writes runs/digest-<time>.md in the person's folder
 #     and marks those listings as sent; the agent then relays the digest as the weekly task says. The agent cannot create
 #     the marker: the tools folder is outside every folder it can write to.
+#   - the score a listing needs to be recommended and to reach the digest comes from the owner's file
+#     <tools folder>/settings/<person>.env, one line: MIN_SCORE=80 . It is read as text, never run. Only MIN_SCORE is understood and
+#     it must be a whole number from 1 to 100; anything else stops the run before it starts. The analyzer's own threshold
+#     (MATCH_THRESHOLD) is set to the same number, so the recommended status and the digest always agree. Without the file the
+#     pipeline's default (70) applies.
 #
 # Overrides, for tests and for the owner only (the agent cannot set environment variables):
 #   JOBSEEKER_DATA_ROOT (default C:/workspace/jobseeker-data), JOBSEEKER_CODE (default C:/workspace/jobseeker),
@@ -38,6 +43,25 @@ HOME_DIR="${DATA_ROOT}/${PERSON}"
 [ -d "$HOME_DIR" ] || fail "no data folder for '${PERSON}' (it is created by the owner, not by this script)"
 [ -f "$CODE/run_jobseeker.sh" ] || fail "run_jobseeker.sh not found in ${CODE}"
 [ -f "$CODE/jobseeker.exe" ] || fail "jobseeker.exe not found in ${CODE} (build it: go build -o jobseeker.exe ./cmd/jobseeker)"
+
+THRESHOLD_SOURCE="default (70)"
+SETTINGS="$TOOLS/settings/${PERSON}.env"
+if [ -f "$SETTINGS" ]; then
+  MIN_SCORE_SETTING=""
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+    case "$line" in ''|'#'*) continue ;; esac
+    if [[ "$line" =~ ^MIN_SCORE=([0-9]{1,3})$ ]]; then
+      MIN_SCORE_SETTING="${BASH_REMATCH[1]}"
+    else
+      fail "settings/${PERSON}.env: only MIN_SCORE=<1 to 100> is understood; found: ${line}"
+    fi
+  done < "$SETTINGS"
+  [ -n "$MIN_SCORE_SETTING" ] || fail "settings/${PERSON}.env has no MIN_SCORE line"
+  (( 10#$MIN_SCORE_SETTING >= 1 && 10#$MIN_SCORE_SETTING <= 100 )) || fail "settings/${PERSON}.env: MIN_SCORE must be from 1 to 100, got ${MIN_SCORE_SETTING}"
+  export MIN_SCORE="$((10#$MIN_SCORE_SETTING))" MATCH_THRESHOLD="$((10#$MIN_SCORE_SETTING))"
+  THRESHOLD_SOURCE="${MIN_SCORE} (settings file)"
+fi
 
 mkdir -p "$HOME_DIR/runs"
 STAMP="$(date +%Y%m%d-%H%M%S)"
@@ -71,6 +95,7 @@ RC=$?
 echo "[run_weekly] person: ${PERSON}"
 echo "[run_weekly] started: ${START}   exit code: ${RC}"
 echo "[run_weekly] log file: runs/${STAMP}.log (in the person folder)"
+echo "[run_weekly] minimum score: ${THRESHOLD_SOURCE}"
 echo "[run_weekly] delivery: $([ "$DELIVERY" = digest ] && echo "digest (listings are marked as sent when the digest is written)" || echo "off (dry run, nothing is marked as sent)")"
 # Status lines only: they carry counts and step names, never a job title or link.
 grep -E '^\[jobseeker\] (Found|No new|SEND_EMAIL|Digest written|Email sent|Marking|Marked|Step|ERROR)' "$LOG" || true

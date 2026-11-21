@@ -26,6 +26,7 @@ cp "$REPO/run_jobseeker.sh" "$CODE/run_jobseeker.sh"
 cat > "$CODE/jobseeker.exe" <<'E'
 #!/bin/bash
 echo "$@" >> "$FAKE_LOG"
+echo "MATCH_THRESHOLD=${MATCH_THRESHOLD:-unset}" >> "${FAKE_LOG}.env"
 [ -n "${FAKE_SLEEP:-}" ] && sleep "$FAKE_SLEEP"
 exit 0
 E
@@ -140,6 +141,31 @@ check "a failing run exits non-zero" "$([ "$RC" -ne 0 ] && echo fail || echo ran
 check "and still releases the lock" "$([ -e "$L" ] && echo yes || echo no)" "no"
 mv "$DATA/alice/.env.off" "$DATA/alice/.env"
 
+
+echo "owner settings (the score a listing needs)"
+mkdir -p "$ROOT/tools/settings"
+thr() { grep -h '^MATCH_THRESHOLD=' "$ROOT/calls.log.env" | tail -1; }
+rm -f "$ROOT/calls.log.env"; runm alice
+check "without a settings file the analyzer threshold is left alone" "$(thr)" "MATCH_THRESHOLD=unset"
+printf '# the owner chose 80
+MIN_SCORE=80
+' > "$ROOT/tools/settings/alice.env"
+rm -f "$ROOT/calls.log.env"; runm alice
+check "a settings file sets the analyzer threshold" "$(thr)" "MATCH_THRESHOLD=80"
+check "and the receipt says so" "$(printf '%s' "$OUT" | grep -c 'minimum score: 80 (settings file)')" "1"
+printf 'MIN_SCORE=80
+' > "$ROOT/tools/settings/alice.env"
+runm alice; check "Windows line endings are accepted" "$RC" "0"
+for badline in 'MIN_SCORE=0' 'MIN_SCORE=101' 'MIN_SCORE=8x' 'MIN_SCORE=80; rm -rf x' 'MIN_SCORE=$(id)' 'OTHER=1' 'MIN_SCORE='; do
+  printf '%s
+' "$badline" > "$ROOT/tools/settings/alice.env"
+  rm -f "$ROOT/calls.log.env"; runm alice
+  check "bad settings line '$badline' stops the run before anything starts" "$(nonzero)$([ -e "$ROOT/calls.log.env" ] && echo ' started')" "fail"
+done
+check "a bad settings file leaves no lock behind" "$([ -e "$L" ] && echo yes || echo no)" "no"
+: > "$ROOT/tools/settings/alice.env"
+runm alice; check "an empty settings file is refused" "$(nonzero)" "fail"
+rm -f "$ROOT/tools/settings/alice.env"
 echo
 echo "$PASS passed, $FAILS failed"
 [ "$FAILS" -eq 0 ]
