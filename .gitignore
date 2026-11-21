@@ -45,3 +45,11 @@ temp/
 /jobdescriptions/
 /coverletters/
 /puppeteer-service/node_modules
+
+# Personal data: never commit these. Copy configs/config.example.yaml to configs/config.yaml.
+configs/config.yaml
+configs/*.local.yaml
+*.xlsx
+resumes/
+jobdescriptions/
+data/
