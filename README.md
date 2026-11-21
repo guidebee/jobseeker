@@ -302,7 +302,7 @@ jobseeker/
    ```
 
 4. **Update your profile**
-   Edit `configs/config.yaml` with:
+   Copy `configs/config.example.yaml` to `configs/config.yaml` (the real file is ignored by git because it holds personal data), then edit it with:
    - **Email address** (must match USER_EMAIL in .env)
    - Your name and location
    - Your skills
@@ -410,7 +410,7 @@ jobseeker init --force
 
 # Output
 Initializing user profile...
-✓ User: James Shen (james.shen@guidebee.com)
+✓ User: Your Name (you@example.com)
 
 Loading profile data...
 ✓ Found 2 resume(s)
@@ -428,8 +428,8 @@ Fetching GitHub repos for: guidebee
 ✓ Profile data initialized
 
 Profile Summary:
-  User: James Shen <james.shen@guidebee.com>
-  Location: Melbourne, VIC
+  User: Your Name <you@example.com>
+  Location: Your City, State
   Plan: free
   Resumes: 2 cached
   GitHub: @guidebee

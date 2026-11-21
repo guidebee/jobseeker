@@ -1,0 +1,74 @@
+# Jobseeker profile: copy this file to configs/config.yaml and fill in your own details.
+# configs/config.yaml is ignored by git on purpose: it holds personal data and must never be committed.
+#   cp configs/config.example.yaml configs/config.yaml        (macOS, Linux, Git Bash)
+#   copy configs\config.example.yaml configs\config.yaml      (Windows cmd)
+
+profile:
+  name: "Your Name"
+  email: "you@example.com"
+  phone: "0400 000 000"
+  location: "Your City, State"
+
+# Your skills (used for job matching)
+skills:
+  - React
+  - TypeScript
+  - Node.js
+  - Python
+  - Go
+  - Docker
+  - Kubernetes
+  - AWS
+  - PostgreSQL
+
+# Years of experience in key areas
+experience:
+  total_years: 10
+  backend_years: 8
+  frontend_years: 5
+  devops_years: 3
+
+# Job preferences
+preferences:
+  job_types:
+    - "Full-time"
+    - "Contract"
+  work_arrangements:
+    - "Remote"
+    - "Hybrid"
+
+# Permanent role salary preference (annual, AUD)
+salary_min: 120000
+
+# Contract rate preferences (AUD)
+contract:
+  hourly_rate_min: 80
+  daily_rate_min: 650
+
+# Target locations
+locations:
+  - "Remote"
+  - "Melbourne, VIC"
+
+# Your professional summary (used by the AI when scoring): lead with your strongest differentiators.
+summary: |
+  Describe your experience in four or five sentences: your main skills, the kinds of systems you have
+  built, the industries you have worked in, and the roles you are open to.
+
+# Job board searches to scrape. Add one URL per search; remove the boards you do not want.
+job_boards:
+  seek:
+    enabled: true
+    search_urls:
+      - "https://www.seek.com.au/jobs?keywords=software+engineer"
+      - "https://www.seek.com.au/jobs?keywords=react+developer&where=Melbourne+VIC"
+
+  linkedin:
+    enabled: true
+    search_urls:
+      - "https://www.linkedin.com/jobs/search/?keywords=software%20engineer&f_WT=2&geoId=101452733"
+
+  indeed:
+    enabled: true
+    search_urls:
+      - "https://au.indeed.com/jobs?q=software+engineer&l=Melbourne%2C+VIC"
