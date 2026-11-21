@@ -2145,10 +2145,18 @@ On Windows use the Task Scheduler to run the same command through Git Bash.
 6. **Emails** an HTML digest (only with `SEND_EMAIL=true`). Every scraped value is HTML-escaped and only `http(s)` links are kept.
 7. **Marks** the jobs as sent, only after the email succeeded.
 
+### Running it from Agent Hub
+
+`tools/run_weekly.sh <person>` is the wrapper the Agent Hub job-hunter agent uses. It takes exactly one argument (the person's name,
+lower-case letters), runs the pipeline from `<data root>/<person>` (default `C:/workspace/jobseeker-data`), writes the full output to that
+person's `runs/` folder and prints only a receipt with counts. Install it outside every folder the agent can write to (for
+example `C:/workspace/jobseeker-tools/`) and change it only through review. The agent policy is in `AGENTS.md`.
+
 ### Tests
 
 ```bash
 bash tests/run_jobseeker_test.sh
+bash tests/run_weekly_test.sh
 ```
 
 Uses a fake binary, a fake email sender and a throwaway database: dry runs mark nothing, a failed send marks nothing, hostile job
