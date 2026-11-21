@@ -16,6 +16,7 @@ import (
 var (
 	analyzeContractOnly bool
 	analyzeJobType      string
+	analyzeRescore      bool
 )
 
 var analyzeCmd = &cobra.Command{
@@ -74,8 +75,13 @@ func runAnalyze(cmd *cobra.Command, args []string) {
 	db := database.GetDB()
 	var jobs []database.Job
 
-	// Build query with job type filter and user filter
+	// Build query with job type filter and user filter. --rescore takes every listing again (after a change of resume, model or
+	// prompt); without it only listings not yet analysed are taken.
 	query := db.Where("user_id = ? AND is_analyzed = ?", user.ID, false)
+	if analyzeRescore {
+		query = db.Where("user_id = ?", user.ID)
+		fmt.Println("Rescoring every listing, including those already analysed...")
+	}
 
 	if analyzeContractOnly {
 		query = query.Where("job_type = ?", "contract")
@@ -100,9 +106,26 @@ func runAnalyze(cmd *cobra.Command, args []string) {
 	recommended := 0
 	scored := 0
 	failed := 0
+	skipped := 0
 	consecutive := 0
 	for i, job := range jobs {
 		fmt.Printf("[%d/%d] Analyzing: %s at %s (%s)\n", i+1, len(jobs), job.Title, job.Company, job.JobType)
+
+		// No advert text (the board rate-limited the description fetch): a score would be a guess from a title. Leave it
+		// unscored; it is analysed once its description exists. A score it already had is cleared so it cannot stay on the shortlist.
+		if !analyzer.HasUsableDescription(&job) {
+			fmt.Printf("  - Skipped: no usable description yet (under %d characters)\n", analyzer.MinDescriptionChars)
+			skipped++
+			if job.IsAnalyzed {
+				job.IsAnalyzed = false
+				job.AnalyzedAt = nil
+				job.MatchScore = 0
+				job.Analysis, job.AnalysisReasoning, job.AnalysisPros, job.AnalysisCons, job.ResumeUsed = "", "", "", "", ""
+				job.Status = "discovered"
+				db.Save(&job)
+			}
+			continue
+		}
 
 		// Analyze with Claude
 		analysis, err := a.AnalyzeJob(&job)
@@ -162,7 +185,7 @@ func runAnalyze(cmd *cobra.Command, args []string) {
 		scored++
 	}
 
-	if scored == 0 {
+	if scored == 0 && skipped == 0 {
 		fmt.Printf("\n✗ Analysis failed: none of the %d listings could be scored (%d failed).\n", len(jobs), failed)
 		os.Exit(1)
 	}
@@ -170,10 +193,13 @@ func runAnalyze(cmd *cobra.Command, args []string) {
 	fmt.Printf("  Scored: %d of %d\n", scored, len(jobs))
 	fmt.Printf("  Recommended jobs: %d\n", recommended)
 	fmt.Printf("  Below threshold: %d\n", scored-recommended)
+	if skipped > 0 {
+		fmt.Printf("  Skipped: %d (no usable description yet; scored once it is fetched)\n", skipped)
+	}
 	if failed > 0 {
 		fmt.Printf("  Failed: %d (retried on the next run)\n", failed)
 	}
-	if notTried := len(jobs) - scored - failed; notTried > 0 {
+	if notTried := len(jobs) - scored - failed - skipped; notTried > 0 {
 		fmt.Printf("  Not attempted: %d\n", notTried)
 	}
 	fmt.Println("\nRun 'jobseeker list --recommended' to see your matches")
@@ -198,4 +224,5 @@ func init() {
 	// Add flags for filtering
 	analyzeCmd.Flags().BoolVar(&analyzeContractOnly, "contract", false, "Analyze only contract roles")
 	analyzeCmd.Flags().StringVarP(&analyzeJobType, "type", "t", "", "Analyze only specific job type (contract, permanent, unknown)")
+	analyzeCmd.Flags().BoolVar(&analyzeRescore, "rescore", false, "Score every listing again, including those already analysed (after a change of resume, model or prompt)")
 }

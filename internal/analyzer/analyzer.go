@@ -12,6 +12,22 @@ import (
 	"github.com/guidebee/jobseeker/pkg/minimax"
 )
 
+// Limits on what goes into one prompt, in characters. The resume limit was 2,000 and applied to raw document XML; as plain text a
+// resume is several thousand characters and the experience is the part that matters, so it gets room. A listing whose
+// description is shorter than MinDescriptionChars (for example because the board rate-limited the fetch) is not scored at all.
+const (
+	MaxResumeChars       = 12000
+	MaxDescriptionChars  = 3000
+	MaxRequirementsChars = 1000
+	MinDescriptionChars  = 200
+)
+
+// HasUsableDescription reports whether a listing has enough advert text to be scored. A match score for a title and a company
+// alone is a guess, and it reached the shortlist: four listings with no description scored 72 to 82.
+func HasUsableDescription(job *database.Job) bool {
+	return len(strings.TrimSpace(job.Description)) >= MinDescriptionChars
+}
+
 // Analyzer handles job matching using MiniMax AI
 type Analyzer struct {
 	minimaxClient *minimax.Client
@@ -166,7 +182,7 @@ Respond ONLY with valid JSON in this exact format:
   "pros": ["reason 1", "reason 2"],
   "cons": ["concern 1", "concern 2"]
 }`,
-		truncate(selectedResume.Content, 2000), // Limit resume length
+		truncate(selectedResume.Content, MaxResumeChars),
 		salaryPref,
 		strings.Join(a.profile.Preferences.JobTypes, ", "),
 		strings.Join(a.profile.Locations, ", "),
@@ -175,8 +191,8 @@ Respond ONLY with valid JSON in this exact format:
 		job.Location,
 		job.Salary,
 		job.JobType,
-		truncate(job.Description, 1000),
-		truncate(job.Requirements, 500),
+		truncate(job.Description, MaxDescriptionChars),
+		truncate(job.Requirements, MaxRequirementsChars),
 	)
 }
 
@@ -230,8 +246,8 @@ Respond ONLY with valid JSON in this exact format:
 		job.Location,
 		job.Salary,
 		job.JobType,
-		truncate(job.Description, 1000),
-		truncate(job.Requirements, 500),
+		truncate(job.Description, MaxDescriptionChars),
+		truncate(job.Requirements, MaxRequirementsChars),
 	)
 }
 
@@ -261,11 +277,13 @@ func (a *Analyzer) parseAnalysisResponse(response string) (*AnalysisResult, erro
 	return &result, nil
 }
 
-// truncate limits string length (useful for API token limits)
+// truncate limits a string to maxLen characters (useful for API token limits). It counts characters, not bytes, so an en dash or an
+// accent counts once and a cut can never fall inside one and corrupt the text.
 func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen] + "..."
+	return string(runes[:maxLen]) + "..."
 }
 
