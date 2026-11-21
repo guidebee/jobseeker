@@ -98,6 +98,9 @@ func runAnalyze(cmd *cobra.Command, args []string) {
 	fmt.Printf("Found %d jobs to analyze\n\n", len(jobs))
 
 	recommended := 0
+	scored := 0
+	failed := 0
+	consecutive := 0
 	for i, job := range jobs {
 		fmt.Printf("[%d/%d] Analyzing: %s at %s (%s)\n", i+1, len(jobs), job.Title, job.Company, job.JobType)
 
@@ -105,8 +108,17 @@ func runAnalyze(cmd *cobra.Command, args []string) {
 		analysis, err := a.AnalyzeJob(&job)
 		if err != nil {
 			log.Printf("  ✗ Error: %v", err)
+			failed++
+			consecutive++
+			if consecutive >= maxConsecutiveFailures {
+				// A rejected key or an empty balance fails every call the same way; do not burn through the rest.
+				fmt.Printf("\n✗ Stopping after %d failed analyses in a row. The last error: %v\n", consecutive, err)
+				fmt.Println("  The remaining listings stay unanalysed and are retried on the next run.")
+				break
+			}
 			continue
 		}
+		consecutive = 0
 
 		// Update job with analysis results
 		now := time.Now()
@@ -147,13 +159,28 @@ func runAnalyze(cmd *cobra.Command, args []string) {
 
 		// Save to database
 		db.Save(&job)
+		scored++
 	}
 
+	if scored == 0 {
+		fmt.Printf("\n✗ Analysis failed: none of the %d listings could be scored (%d failed).\n", len(jobs), failed)
+		os.Exit(1)
+	}
 	fmt.Printf("\n✓ Analysis complete!\n")
+	fmt.Printf("  Scored: %d of %d\n", scored, len(jobs))
 	fmt.Printf("  Recommended jobs: %d\n", recommended)
-	fmt.Printf("  Below threshold: %d\n", len(jobs)-recommended)
+	fmt.Printf("  Below threshold: %d\n", scored-recommended)
+	if failed > 0 {
+		fmt.Printf("  Failed: %d (retried on the next run)\n", failed)
+	}
+	if notTried := len(jobs) - scored - failed; notTried > 0 {
+		fmt.Printf("  Not attempted: %d\n", notTried)
+	}
 	fmt.Println("\nRun 'jobseeker list --recommended' to see your matches")
 }
+
+// maxConsecutiveFailures stops the analysis when this many calls in a row fail.
+const maxConsecutiveFailures = 5
 
 // joinStrings joins a slice of strings with a separator
 func joinStrings(items []string, sep string) string {

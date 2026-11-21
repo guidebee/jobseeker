@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 )
 
 const (
 	APIBaseURL      = "https://api.minimax.io/v1/text/chatcompletion_v2"
-	DefaultModel    = "MiniMax-M2.5"
+	// MiniMax retired the M2.x models (error 2069, November 2026); M1 is the model that answers. Override with MINIMAX_MODEL.
+	DefaultModel    = "MiniMax-M1"
 	DefaultMaxTokens = 8192
 )
 
@@ -19,14 +21,20 @@ const (
 type Client struct {
 	APIKey     string
 	Model      string
+	BaseURL    string
 	HTTPClient *http.Client
 }
 
 // NewClient creates a new MiniMax API client
 func NewClient(apiKey string) *Client {
+	model := DefaultModel
+	if override := os.Getenv("MINIMAX_MODEL"); override != "" {
+		model = override
+	}
 	return &Client{
-		APIKey: apiKey,
-		Model:  DefaultModel,
+		APIKey:  apiKey,
+		Model:   model,
+		BaseURL: APIBaseURL,
 		HTTPClient: &http.Client{
 			Timeout: 60 * time.Second,
 		},
@@ -45,6 +53,11 @@ type request struct {
 }
 
 type response struct {
+	// MiniMax reports account problems (a rejected key, no balance, rate limits) as HTTP 200 with this block and no choices.
+	BaseResp struct {
+		StatusCode int    `json:"status_code"`
+		StatusMsg  string `json:"status_msg"`
+	} `json:"base_resp"`
 	Choices []struct {
 		Message struct {
 			Content string `json:"content"`
@@ -73,7 +86,7 @@ func (c *Client) SendMessage(userMessage string) (string, error) {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", APIBaseURL, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", c.BaseURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
@@ -101,9 +114,16 @@ func (c *Client) SendMessage(userMessage string) (string, error) {
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 
+	if apiResp.BaseResp.StatusCode != 0 {
+		return "", fmt.Errorf("MiniMax API error %d: %s", apiResp.BaseResp.StatusCode, apiResp.BaseResp.StatusMsg)
+	}
+
 	if len(apiResp.Choices) > 0 {
+		if apiResp.Choices[0].Message.Content == "" {
+			return "", fmt.Errorf("MiniMax returned an empty answer (finish reason %q)", apiResp.Choices[0].FinishReason)
+		}
 		return apiResp.Choices[0].Message.Content, nil
 	}
 
-	return "", fmt.Errorf("no content in response")
+	return "", fmt.Errorf("MiniMax returned no choices and no error")
 }
