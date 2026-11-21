@@ -2122,6 +2122,14 @@ changing the resumes or the profile. SQL statements are no longer logged; set `J
 run. Only `SEND_EMAIL=true` emails the shortlist, and the jobs are marked as sent only **after the email was sent**. If sending
 fails, nothing is marked and the next run tries again.
 
+### Digest delivery (Agent Hub pilot)
+
+With `DELIVERY=digest` the run writes the shortlist as `runs/digest-<time>.md` in the person's folder (Markdown, every scraped value
+escaped, only `http(s)` links) and **then** marks those listings as sent. Someone relays the file; in the Agent Hub pilot that is the
+job-hunter agent, which posts it to the owner. `tools/run_weekly.sh` turns this on only when the owner has created the marker file
+`<tools folder>/delivery/<person>.on`; without it the run is a dry run. Create the marker only after a dry run looks right, and delete
+it to go back to a dry run. The agent cannot create or delete it, because the tools folder is outside every folder it can write to.
+
 ### Settings
 
 | Variable | Default | Purpose |

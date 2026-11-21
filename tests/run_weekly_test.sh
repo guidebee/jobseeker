@@ -37,8 +37,8 @@ for p in alice bob; do
 import sqlite3, sys
 c = sqlite3.connect(sys.argv[1])
 c.execute("""CREATE TABLE jobs (id INTEGER PRIMARY KEY, title TEXT, company TEXT, location TEXT, salary TEXT, url TEXT,
-  match_score INTEGER, analysis_pros TEXT, analysis_cons TEXT, analysis TEXT, is_analyzed INTEGER, deleted_at TEXT, emailed_at TEXT)""")
-c.execute("INSERT INTO jobs VALUES (1,?,?,?,?,?,88,'p','c','a',1,NULL,NULL)", ('SECRET-TITLE-' + sys.argv[2], 'Acme', 'Melbourne', '', 'https://example.com/secret-link'))
+  match_score INTEGER, analysis_pros TEXT, analysis_cons TEXT, analysis TEXT, is_analyzed INTEGER, deleted_at TEXT, emailed_at TEXT, source TEXT, job_type TEXT)""")
+c.execute("INSERT INTO jobs VALUES (1,?,?,?,?,?,88,'p','c','a',1,NULL,NULL,'seek','permanent')", ('SECRET-TITLE-' + sys.argv[2], 'Acme', 'Melbourne', '', 'https://example.com/secret-link'))
 c.commit()
 E
 done
@@ -83,6 +83,26 @@ run alice
 check "a failing run exits non-zero" "$(nonzero)" "fail"
 case "$OUT" in *"log file"*) ok "still names the log file" ;; *) bad "still names the log file: $OUT" ;; esac
 mv "$DATA/alice/.env.off" "$DATA/alice/.env"
+
+echo "delivery marker"
+mkdir -p "$ROOT/tools/delivery"
+runm() { OUT="$(env JOBSEEKER_DATA_ROOT="$DATA" JOBSEEKER_CODE="$CODE" JOBSEEKER_TOOLS="$ROOT/tools" FAKE_LOG="$ROOT/calls.log" bash "$WRAPPER" "$@" 2>&1)"; RC=$?; }
+runm bob
+check "without a marker the run is a dry run" "$(printf '%s' "$OUT" | grep -c 'delivery: off')" "1"
+check "and nothing is marked as sent" "$(sent_count bob)" "0"
+touch "$ROOT/tools/delivery/alice.on"
+runm bob
+check "another person's marker does not enable bob" "$(printf '%s' "$OUT" | grep -c 'delivery: off')" "1"
+check "bob still has nothing marked" "$(sent_count bob)" "0"
+runm alice
+check "with the marker the run exits 0" "$RC" "0"
+check "the receipt says delivery is on" "$(printf '%s' "$OUT" | grep -c 'delivery: digest')" "1"
+check "the receipt names the digest file" "$(printf '%s' "$OUT" | grep -c 'Digest written: runs/digest-')" "1"
+check "a digest file is in alice's runs folder" "$(ls "$DATA/alice/runs" | grep -c '^digest-')" "1"
+check "the digest holds the listing" "$(grep -c 'SECRET-TITLE-alice' "$DATA"/alice/runs/digest-*.md | tr -d ' ')" "1"
+check "the receipt still shows no job title" "$(printf '%s' "$OUT" | grep -c 'SECRET-TITLE')" "0"
+check "the receipt still shows no link" "$(printf '%s' "$OUT" | grep -c 'secret-link')" "0"
+check "alice's listing is marked as sent" "$(sent_count alice)" "1"
 
 echo
 echo "$PASS passed, $FAILS failed"

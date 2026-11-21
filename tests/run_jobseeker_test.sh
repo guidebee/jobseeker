@@ -47,11 +47,11 @@ new_home() {
 import sqlite3, sys
 c = sqlite3.connect(sys.argv[1])
 c.execute("""CREATE TABLE jobs (id INTEGER PRIMARY KEY, title TEXT, company TEXT, location TEXT, salary TEXT, url TEXT,
-  match_score INTEGER, analysis_pros TEXT, analysis_cons TEXT, analysis TEXT, is_analyzed INTEGER, deleted_at TEXT, emailed_at TEXT)""")
+  match_score INTEGER, analysis_pros TEXT, analysis_cons TEXT, analysis TEXT, is_analyzed INTEGER, deleted_at TEXT, emailed_at TEXT, source TEXT, job_type TEXT)""")
 hostile = 'Dev """ \\\\ \\n <script>alert(1)</script> "quoted" & co'
-c.execute("INSERT INTO jobs VALUES (1,?,?,?,?,?,90,'good','bad','fine',1,NULL,NULL)", (hostile, 'Acme <b>', 'Melbourne', '', 'javascript:alert(1)'))
-c.execute("INSERT INTO jobs VALUES (2,'Plain role','Co','Perth','',  'https://example.com/j/2',75,'p','c','a',1,NULL,NULL)")
-c.execute("INSERT INTO jobs VALUES (3,'Low score','Co','Perth','','https://example.com/j/3',40,'p','c','a',1,NULL,NULL)")
+c.execute("INSERT INTO jobs VALUES (1,?,?,?,?,?,90,'[\"good\", \"better *bold*\"]','[\"bad\"]','fine',1,NULL,NULL,'seek','permanent')", (hostile, 'Acme <b>', 'Melbourne', '', 'javascript:alert(1)'))
+c.execute("INSERT INTO jobs VALUES (2,'Plain role','Co','Perth','',  'https://example.com/j/2',75,'[\"p\"]','[\"c\"]','a',1,NULL,NULL,'linkedin','contract')")
+c.execute("INSERT INTO jobs VALUES (3,'Low score','Co','Perth','','https://example.com/j/3',40,'p','c','a',1,NULL,NULL,'seek','permanent')")
 c.commit()
 E
 }
@@ -117,6 +117,28 @@ run "$C"
 case "$OUT" in *MINIMAX_API_KEY*) ok "names the missing MINIMAX_API_KEY" ;; *) bad "names the missing MINIMAX_API_KEY: $OUT" ;; esac
 run "$B" MIN_SCORE="70; DROP TABLE jobs"
 check "non-numeric MIN_SCORE fails" "$([ "$RC" -ne 0 ] && echo fail || echo ran)" "fail"
+
+echo "digest delivery"
+D="$ROOT/d"; new_home "$D"
+check "a dry run writes no digest" "$([ -e "$H/runs" ] && ls "$H/runs" | grep -c digest || echo 0)" "0"
+run "$D" DELIVERY=digest JOBSEEKER_RUN_STAMP=20261121-120000
+check "exits 0" "$RC" "0"
+DIGEST="$D/runs/digest-20261121-120000.md"
+check "writes the digest in the person folder" "$([ -s "$DIGEST" ] && echo yes || echo no)" "yes"
+check "marks the 2 shortlisted jobs as sent" "$(sent_count "$D")" "2"
+check "the low-scoring listing is not in the digest" "$(grep -c 'Low score' "$DIGEST")" "0"
+check "the strongest listing comes first" "$(grep -n '^## ' "$DIGEST" | head -1 | grep -c '90/100')" "1"
+check "scraped HTML does not survive as HTML" "$(grep -c '<script>' "$DIGEST")" "0"
+check "scraped HTML is shown escaped" "$(grep -cF '\<script\>' "$DIGEST")" "1"
+check "an unsafe link is not made a link" "$(grep -c 'javascript:' "$DIGEST")" "0"
+check "a web link is kept as a link" "$(grep -cF '[Open the advert](https://example.com/j/2)' "$DIGEST")" "1"
+check "pros are listed and their markdown is escaped" "$(grep -cF 'Pro: better \*bold\*' "$DIGEST")" "1"
+check "cons are listed" "$(grep -c 'Con: bad' "$DIGEST")" "1"
+check "board and job type are shown" "$(grep -c 'linkedin · contract' "$DIGEST")" "1"
+case "$OUT" in *"Digest written: runs/digest-20261121-120000.md"*) ok "the log names the digest" ;; *) bad "the log names the digest: $OUT" ;; esac
+run "$D" DELIVERY=digest JOBSEEKER_RUN_STAMP=20261121-130000
+case "$OUT" in *"No new recommended"*) ok "the next run has nothing new" ;; *) bad "the next run has nothing new: $OUT" ;; esac
+check "and writes no second digest" "$(ls "$D/runs" | grep -c digest)" "1"
 
 echo
 echo "$PASS passed, $FAILS failed"
